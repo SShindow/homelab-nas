@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="480" fill="#0f172a"/>
+<svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="560" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -52,6 +52,25 @@
   <text x="775" y="278" text-anchor="middle" fill="#4ade80" font-size="12" font-weight="600">SMB Share: NAS-VN</text>
   <text x="775" y="296" text-anchor="middle" fill="#bbf7d0" font-size="11">128GB SSD (OS)</text>
 
+  <!-- Google Drive backup module -->
+  <rect x="680" y="400" width="190" height="90" rx="10" fill="#1e293b" stroke="#facc15" stroke-width="2.5"/>
+  <text x="775" y="428" text-anchor="middle" fill="#fefce8" font-size="15" font-weight="700">Google Drive</text>
+  <text x="775" y="446" text-anchor="middle" fill="#fef08a" font-size="11">Important Files</text>
+  <text x="775" y="464" text-anchor="middle" fill="#fef08a" font-size="11">folder</text>
+
+  <line x1="775" y1="400" x2="775" y2="322" stroke="#facc15" stroke-width="2.5" marker-end="url(#arrow-y)"/>
+  <text x="835" y="365" fill="#fde68a" font-size="11" font-weight="600">PULL</text>
+  <text x="835" y="380" fill="#fde68a" font-size="11">(COPY, one-way)</text>
+
+  <defs>
+    <marker id="arrow-y" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#facc15"/>
+    </marker>
+  </defs>
+
+  <text x="775" y="333" text-anchor="middle" fill="#64748b" font-size="10">Cloud Sync Task (rclone)</text>
+
   <!-- Footer -->
-  <text x="450" y="440" text-anchor="middle" fill="#64748b" font-size="12">Client → Tailscale VPN (encrypted mesh) → NAS SMB share — no exposed public IP</text>
+  <text x="450" y="530" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="548" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>
