@@ -35,8 +35,12 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
 - CPU: Intel Pentium G3240
 - RAM: 16GB DDR3
-- Motherboard: ASUS H81M-I
+- Motherboard: ASUS H81M-D (BIOS v2106)
 - Storage: 2x 2TB Seagate HDD (mirrored ZFS pool), 128GB Kingston SSD (boot/OS)
+- GPU: GTX 650 (available but not currently installed — power draw vs. hardware transcoding tradeoff still under evaluation)
+- Router: ISP-issued GPON ONT (no WAN-side Wake-on-LAN support)
+
+**Deployment note:** the NAS is physically hosted at a remote location (family home) and administered entirely over the network — all setup, testing, and troubleshooting shown here was done remotely, with family assisting on-site only for physical steps (e.g., swapping hardware).
 
 ## Setup Steps
 
@@ -74,6 +78,23 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
 **Status:** ✅ Fully operational — Google Drive files now back up automatically to the NAS on a schedule, viewable from any connected device.
 
+## Module: Power-Loss Resilience & Unattended Recovery
+
+**Goal:** Since the NAS is managed entirely remotely, it needs to survive a full home power interruption (fuse trips, outage) and come back online automatically — without a smart plug, UPS, or WoL trigger, and without needing anyone on-site to intervene.
+
+**Problem discovered:** After a hard power cut (fuse off, not a graceful shutdown), the motherboard's BIOS setting `Restore AC Power Loss → Power On` was reverting to a default that left the machine powered off after power returned. A graceful shutdown never showed this issue, because the PSU's standby power (+5VSB) keeps BIOS settings alive — it's *only* a full power cut that exposes reliance on the onboard CMOS battery.
+
+**Root cause:** A depleted/failing CMOS (CR2032) battery. When standby power is also removed (full power cut), BIOS configuration falls back to the CMOS battery to retain state — a weak battery meant the "power on after power loss" setting silently reset every time.
+
+**Fix & verification:**
+1. Replaced the CR2032 CMOS battery on the motherboard (on-site, physical task).
+2. Re-entered BIOS and set **Restore AC Power Loss → Power On**.
+3. Ran a full real-world test: cut power at the home fuse box → restored it → confirmed the router powered back on independently → confirmed the NAS auto-booted without manual input → confirmed Tailscale auto-reconnected and the NAS was reachable remotely again, fully unattended.
+
+**Why not WoL / a smart plug:** True Wake-on-LAN was ruled out — the fuse cut also kills power to the router itself, so there's no network path to send a WoL packet over in the first place. A smart plug or UPS could add scheduled/remote power-cycling, but wasn't necessary once the actual root cause (CMOS battery) was fixed — the home's own fuse restoring power is now sufficient to bring the whole stack back unattended.
+
+**Status:** ✅ Verified end-to-end — fuse off → fuse on → router boots → NAS auto-boots → Tailscale auto-reconnects, with zero manual steps.
+
 ## Key Challenges & Fixes
 
 | Problem | Root Cause | Fix |
@@ -81,6 +102,8 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 | Android device intermittently lost VPN connectivity in the background | Android's battery optimization was killing Tailscale's background process | Settings → Apps → Tailscale → Battery → set to **Unrestricted** |
 | NAS occasionally disappeared from the Tailscale network after reboot | Auth key was set to ephemeral, causing the node registration to expire | Regenerated the key as **Reusable**, **Ephemeral: off** |
 | Needed cloud backup without risking cloud-side deletions wiping local copies | Live 2-way sync isn't natively supported and adds deletion risk | Used one-way **Pull + Copy** Cloud Sync Task instead of bidirectional sync |
+| TrueNAS Apps occasionally failed on cold boot with "Unable to determine default interface" | Known Docker/TrueNAS Apps timing/race condition on startup, not a real misconfiguration | Re-select the Apps pool or restart the Docker service after boot |
+| NAS didn't power back on after a full home power cut, even with "Restore AC Power Loss" set | Failing CMOS battery — only exposed by full power cuts, since graceful shutdowns rely on PSU standby power instead | Replaced the CR2032 CMOS battery; verified with a real fuse-cut test |
 
 ## Results
 
@@ -93,13 +116,19 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 - Mesh VPNs like Tailscale remove almost all the traditional networking pain (port forwarding, dynamic DNS, firewall rules) from remote NAS access.
 - Mobile OS battery management is an under-documented source of "random" VPN drops — worth checking first when debugging intermittent connectivity.
 - Auth key configuration (ephemeral vs. reusable) matters more than it seems for long-running headless nodes.
+- BIOS "power on after power loss" settings can silently depend on a healthy CMOS battery — this only surfaces during a *full* power cut, since normal shutdowns are masked by the PSU's standby power. Worth testing with a real power cut, not just a reboot, before trusting unattended recovery.
 
 ## Future Improvements
 
 - [x] ~~Automated off-site/cloud backup of critical datasets~~ → done via Cloud Sync Task (see above)
+- [x] ~~Unattended recovery from a full power outage~~ → done via CMOS battery fix (see above)
+- [ ] GTX 650 reinstallation for Jellyfin hardware transcoding — evaluating whether the transcoding benefit is worth the added power draw
+- [ ] Jellyfin media server setup
 - [ ] True live 2-way sync (`rclone bisync` + cron) — only if convenience outweighs backup-safety tradeoff
 - [ ] Monitoring/alerting (e.g., Uptime Kuma or TrueNAS alert integrations)
-- [ ] Additional self-hosted services (media server, document management) on the same box
+- [ ] Nextcloud (personal cloud), Vaultwarden (password manager), Pi-hole (network-wide ad blocking)
+- [ ] ZFS snapshot strategy for point-in-time recovery
+- [ ] PiKVM for true out-of-band hardware access (board has no IPMI)
 
 ---
 
