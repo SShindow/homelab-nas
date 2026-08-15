@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="620" fill="#0f172a"/>
+<svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="700" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -78,7 +78,13 @@
   <text x="60" y="500" fill="#94a3b8" font-size="11">Root cause fixed: CMOS battery replacement + BIOS "Restore AC Power Loss"</text>
   <text x="60" y="516" fill="#94a3b8" font-size="11">(WoL ruled out — the fuse also cuts power to the router itself)</text>
 
+  <!-- ZFS snapshot module -->
+  <rect x="40" y="550" width="580" height="100" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text x="60" y="578" fill="#ddd6fe" font-size="14" font-weight="700">📸 ZFS Snapshots (local point-in-time recovery)</text>
+  <text x="60" y="602" fill="#e2e8f0" font-size="12">Daily @ 02:00 · 7-day retention  |  Weekly @ Sun 03:00 · 4-week retention</text>
+  <text x="60" y="624" fill="#94a3b8" font-size="11">Layered with Google Drive backup: cloud = off-site durability, snapshots = instant local recovery</text>
+
   <!-- Footer -->
-  <text x="450" y="580" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
-  <text x="450" y="598" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
+  <text x="450" y="660" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="678" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>

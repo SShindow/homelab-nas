@@ -1,0 +1,17 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Secrets & credentials — never commit these
+*.key
+*.pem
+*credentials*
+*.env
+.env.*
+
+# Local scratch/config exports that may contain sensitive paths or IPs
+configs/*.local.*

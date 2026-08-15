@@ -28,6 +28,7 @@ This is a living project — new capabilities are added and documented increment
 | File Sharing Protocol | SMB (Samba) |
 | Clients | Windows, iOS, Android |
 | Cloud Backup | TrueNAS Cloud Sync Task (rclone) — Google Drive → NAS |
+| Local Point-in-Time Recovery | ZFS periodic snapshots (daily + weekly) |
 
 See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
@@ -95,6 +96,24 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
 **Status:** ✅ Verified end-to-end — fuse off → fuse on → router boots → NAS auto-boots → Tailscale auto-reconnects, with zero manual steps.
 
+## Module: ZFS Snapshot Strategy
+
+**Goal:** Add fast, local point-in-time recovery on top of the existing off-site Google Drive backup — so accidental deletions or changes can be undone instantly without depending on a cloud restore.
+
+**Design:** Two periodic snapshot tasks on `tank/swimming-pool/sshindow-private`:
+
+| Task | Schedule | Retention | Naming schema |
+|---|---|---|---|
+| Daily | 02:00 every day | 7 days | `daily-%Y%m%d-%H%M` |
+| Weekly | 03:00 every Sunday | 4 weeks | `weekly-%Y%m%d` |
+
+**Rationale:**
+- Daily snapshots give fine-grained recovery from accidental deletion or edits within the last week.
+- Weekly snapshots extend that safety net to roughly a month of history, at lower storage overhead.
+- This creates a **layered backup strategy**: Google Drive Cloud Sync (COPY) provides off-site durability against total local hardware loss, while ZFS snapshots provide instant, local, low-latency recovery for day-to-day mistakes — each covering a failure mode the other doesn't.
+
+**Status:** ✅ Tasks enabled and scheduled. First daily and weekly snapshots run automatically without manual intervention.
+
 ## Key Challenges & Fixes
 
 | Problem | Root Cause | Fix |
@@ -117,17 +136,18 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 - Mobile OS battery management is an under-documented source of "random" VPN drops — worth checking first when debugging intermittent connectivity.
 - Auth key configuration (ephemeral vs. reusable) matters more than it seems for long-running headless nodes.
 - BIOS "power on after power loss" settings can silently depend on a healthy CMOS battery — this only surfaces during a *full* power cut, since normal shutdowns are masked by the PSU's standby power. Worth testing with a real power cut, not just a reboot, before trusting unattended recovery.
+- No single backup mechanism covers every failure mode — off-site cloud copy protects against hardware loss, while local ZFS snapshots protect against accidental deletion/edits with near-zero recovery time. Layering both is more robust than relying on either alone.
 
 ## Future Improvements
 
 - [x] ~~Automated off-site/cloud backup of critical datasets~~ → done via Cloud Sync Task (see above)
 - [x] ~~Unattended recovery from a full power outage~~ → done via CMOS battery fix (see above)
+- [x] ~~ZFS snapshot strategy for point-in-time recovery~~ → done via daily/weekly periodic snapshots (see above)
 - [ ] GTX 650 reinstallation for Jellyfin hardware transcoding — evaluating whether the transcoding benefit is worth the added power draw
 - [ ] Jellyfin media server setup
 - [ ] True live 2-way sync (`rclone bisync` + cron) — only if convenience outweighs backup-safety tradeoff
 - [ ] Monitoring/alerting (e.g., Uptime Kuma or TrueNAS alert integrations)
 - [ ] Nextcloud (personal cloud), Vaultwarden (password manager), Pi-hole (network-wide ad blocking)
-- [ ] ZFS snapshot strategy for point-in-time recovery
 - [ ] PiKVM for true out-of-band hardware access (board has no IPMI)
 
 ---
