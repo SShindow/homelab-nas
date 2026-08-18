@@ -199,8 +199,10 @@ Instead, I compared **autonomous system numbers** across two genuinely different
 
 | Exit node | Public IP | Reverse DNS | ASN |
 |---|---|---|---|
-| **off** | `125.235.190.96` | `…adsl.viettel.vn` | **AS7552 Viettel** |
-| **on** | `113.173.11.228` | `static.vnpt.vn` | **AS45899 VNPT** |
+| **off** | `125.235.x.x` | `…adsl.viettel.vn` | **AS7552 Viettel** |
+| **on** | `113.173.x.x` | `static.vnpt.vn` | **AS45899 VNPT** |
+
+*(Public IPs partially masked — the ASN is the evidence here, not the address. Both are dynamic residential/mobile addresses.)*
 
 Corroborated on the NAS itself, which accounted for the traffic it carried — 78 MB transmitted to the client, measured at the router rather than at either endpoint:
 
