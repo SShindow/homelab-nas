@@ -144,6 +144,9 @@ Saved is not the same as applied — verified directly:
 sysctl net.ipv4.ip_forward net.ipv6.conf.all.forwarding
 ```
 
+![IP forwarding sysctl tunables in TrueNAS](docs/img/exit-node-sysctls.png)
+*Both forwarding tunables enabled under System → Advanced Settings → Sysctl.*
+
 ### Configuration change: Userspace networking had to be disabled
 
 This reverses a decision from the original Tailscale install above. In **Userspace** mode, Tailscale runs its own TCP/IP stack inside the container and never touches the host's routing tables — fine for acting as a client, but it means the node can advertise an exit route it is structurally incapable of servicing.
@@ -156,6 +159,9 @@ This reverses a decision from the original Tailscale install above. In **Userspa
 | Accept Routes | off | this node isn't a subnet-router client |
 | Advertise Routes | empty | subnet routing is a separate feature, kept out of scope |
 | Timezone | `Asia/Ho_Chi_Minh` | readable log timestamps when debugging from another country |
+
+![Tailscale app configuration](docs/img/exit-node-app-config.png)
+*Advertise Exit Node enabled, Userspace disabled.*
 
 **Problem discovered:** with every prerequisite satisfied — sysctls verified, `Advertise Exit Node` checked, app redeployed — the Tailscale admin console showed the node as connected but with **no exit-node status at all**. Not "awaiting approval"; nothing.
 
@@ -189,6 +195,10 @@ sudo docker exec ix-tailscale-tailscale-1 tailscale set --advertise-exit-node
 
 The node then appeared in the admin console as *awaiting approval*, and was approved at **Machines → truenas-scale → Routing Settings → Exit Node → Allowed**. Advertising alone is deliberately not enough — Tailscale requires an admin to sign off before a node can act as the tailnet's internet gateway.
 
+![Exit node awaiting approval](docs/img/exit-node-awaiting-approval.jpeg)
+![Exit node allowed](docs/img/exit-node-allowed.jpeg)
+*Before and after admin approval: advertising alone leaves the node unusable as an exit.*
+
 > **⚠ Operational caveat:** this setting lives in the daemon's persisted state, **not** in the TrueNAS app configuration. It survives restarts and reboots, but rebuilding the app from its TrueNAS settings alone would not restore it, and an app update may re-run the broken code path. Post-upgrade check: re-run `tailscale debug prefs` and confirm both default routes are still present.
 
 ### Verification — and why the obvious test would have been worthless
@@ -204,6 +214,9 @@ Instead, I compared **autonomous system numbers** across two genuinely different
 
 *(Public IPs partially masked — the ASN is the evidence here, not the address. Both are dynamic residential/mobile addresses.)*
 
+![ASN comparison with exit node off and on](docs/img/exit-node-asn-comparison.png)
+*Same device, three minutes apart: the originating network changes from AS7552 Viettel to AS45899 VNPT.*
+
 Corroborated on the NAS itself, which accounted for the traffic it carried — 78 MB transmitted to the client, measured at the router rather than at either endpoint:
 
 ```
@@ -211,6 +224,9 @@ iphone-13-pro   active; direct [2401:d800:…]:41641, tx 78447936 rx 5026320
 ```
 
 **DNS:** `dnsleaktest.com` through the exit node returned `113.164.250.130` / `.138` — `system.vnptnet.vn`, VNPT. The correct result here is not "the resolvers are Vietnamese" but **"the resolvers belong to the same network the traffic exits from."** Egress is VNPT and resolvers are VNPT, so queries travel through the tunnel and resolve on the far side; the mobile carrier the device is physically attached to observes only encrypted WireGuard traffic.
+
+![DNS leak test through the exit node](docs/img/exit-node-dns-leak-test.png)
+*Resolvers belong to VNPT — the same network the traffic exits from.*
 
 **Connection path:** `direct`, not `relay` — peer-to-peer, with no DERP relay in the path. The mobile client connected over **IPv6**: VNPT provides public IPv6, so NAT traversal succeeded without any port forwarding on the router.
 
@@ -261,15 +277,6 @@ sudo docker exec ix-tailscale-tailscale-1 tailscale set --advertise-exit-node
 Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains both `0.0.0.0/0` and `::/0`.
 
 **Status:** ✅ Operational and verified — exit node advertised, approved, and confirmed carrying client traffic by ASN change, with no DNS leak and no measurable throughput penalty. Cross-country verification from Europe still pending.
-
-<!-- Screenshots to add under docs/img/ — uncomment once committed:
-![Sysctl tunables](docs/img/exit-node-sysctls.png)
-![Advertise Exit Node enabled](docs/img/exit-node-app-config.png)
-![Exit node awaiting approval](docs/img/exit-node-awaiting-approval.png)
-![Exit node allowed](docs/img/exit-node-allowed.png)
-![ASN comparison: Viettel vs VNPT](docs/img/exit-node-asn-comparison.png)
-![DNS leak test](docs/img/exit-node-dns-leak-test.png)
--->
 
 ## Key Challenges & Fixes
 
