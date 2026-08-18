@@ -200,6 +200,8 @@ The node then appeared in the admin console as *awaiting approval*, and was appr
 *Before and after admin approval: advertising alone leaves the node unusable as an exit.*
 
 > **⚠ Operational caveat:** this setting lives in the daemon's persisted state, **not** in the TrueNAS app configuration. It survives restarts and reboots, but rebuilding the app from its TrueNAS settings alone would not restore it, and an app update may re-run the broken code path. Post-upgrade check: re-run `tailscale debug prefs` and confirm both default routes are still present.
+>
+> **Persistence verified:** a full reboot was tested afterwards — `AdvertiseRoutes` survived, and the node came back advertising and still approved. So `containerboot` ignores the flag but does not *clear* it: once set on the daemon, the setting sticks. The remaining risk is anything that discards the daemon's state (volume recreated, re-authentication, the `Reset` toggle), not an ordinary restart.
 
 ### Verification — and why the obvious test would have been worthless
 
