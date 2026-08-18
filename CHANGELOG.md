@@ -6,6 +6,16 @@ All notable changes to this project are documented here, in the order they were 
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - Jellyfin media server setup
 
+## 2026 — Tailscale Exit Node (Personal VPN)
+- Configured the NAS as a Tailscale exit node, so client devices can route their full internet connection out through the home line
+- Enabled `net.ipv4.ip_forward` and `net.ipv6.conf.all.forwarding` as TrueNAS sysctl tunables
+- Disabled Userspace networking and enabled Host Network — Userspace mode cannot forward other devices' traffic
+- Diagnosed the "Advertise Exit Node" checkbox having no effect: with `Auth Once` and an already-authenticated node, `containerboot` applies settings via `tailscale set`, which ignores `--advertise-exit-node` from `TS_EXTRA_ARGS` (tailscale#14496, truenas/apps#3486)
+- Worked around it by applying the flag directly to the daemon; documented as a post-upgrade runbook check since it lives outside TrueNAS config
+- Designed an ASN-based verification method after recognising that the obvious public-IP test would have produced a false positive when run from the same network as the NAS
+- Confirmed no DNS leak, a direct (non-relayed) IPv6 peer-to-peer path, and no measurable throughput penalty from the tunnel
+- Benchmarked the line: ~155–170 Mbps upstream international, ~439 Mbps domestic — the ~2.5x gap matters for predicting cross-country performance
+
 ## 2026 — ZFS Snapshot Strategy
 - Added daily (7-day retention) and weekly (4-week retention) periodic ZFS snapshots on the primary dataset
 - Established a layered backup model: off-site Cloud Sync for durability + local snapshots for instant point-in-time recovery
