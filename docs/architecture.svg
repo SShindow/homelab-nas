@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 960" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="960" fill="#0f172a"/>
+<svg viewBox="0 0 900 1090" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="1090" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -107,6 +107,17 @@
     <text x="60" y="886" fill="#64748b" font-size="11">319 MiB/hour per camera vs 80.2 MB/s pool write ceiling (&lt;1%) · 13-15% CPU · remote live view about 1.42 Mbps</text>
   </g>
 
-  <text x="450" y="920" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
-  <text x="450" y="938" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
+  
+  <!-- Observability -->
+  <g>
+    <rect x="40" y="908" width="820" height="118" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="60" y="936" fill="#fde68a" font-size="14" font-weight="700">📊 Observability (Prometheus + Grafana)</text>
+    <text x="60" y="960" fill="#e2e8f0" font-size="12">node_exporter (host binary, :9100) --scrape 15s--&gt; Prometheus (:30104) --&gt; Grafana (:30037), reachable over Tailscale</text>
+    <text x="60" y="980" fill="#94a3b8" font-size="11">~2,770 host metrics · 30d retention · config on a host-path dataset (ixVolume is wiped on reinstall)</text>
+    <text x="60" y="998" fill="#94a3b8" font-size="11">Exporter runs on the host, not in a container, to keep the ZFS collector and real /proc and /sys visibility</text>
+    <text x="60" y="1016" fill="#64748b" font-size="11">Auto-started by a Post Init script · reboot-verified, both scrape targets UP unattended · alerting not yet configured</text>
+  </g>
+
+  <text x="450" y="1050" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="1068" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>

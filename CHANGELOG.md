@@ -6,6 +6,17 @@ All notable changes to this project are documented here, in the order they were 
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - Jellyfin media server setup
 
+## 2026 — Observability with Prometheus + Grafana
+- Deployed Prometheus and Grafana on TrueNAS, with node_exporter v1.9.0 installed as a host binary rather than a container so the ZFS collector and host /proc, /sys visibility are retained
+- Worked out that TrueNAS assigns Prometheus a non-default port (30104), ships it with an empty scrape config, and bundles no exporter — none of the standard setup guides apply unmodified
+- Resolved Grafana being unable to reach Prometheus: the two apps sit on separate Docker bridges, so the host LAN IP is the working address rather than any container name or IP
+- Moved Prometheus config off ixVolume onto a dedicated host-path dataset after a reinstall wiped it; kept the TSDB on ixVolume deliberately, since time-series data is disposable and config is not
+- Pinned the NAS IP by DHCP reservation so the hardcoded scrape target cannot drift
+- Auto-start via a Post Init script; verified across a full reboot with both scrape targets returning UP unattended
+- Imported the Node Exporter Full dashboard (ID 1860); ~2,770 host metrics scraped at 15s intervals, 30d retention
+- Documented the supportability trade-off: node_exporter is outside TrueNAS's supported model, updates are manual, and /metrics is unauthenticated on the LAN and tailnet
+- Deferred: alert rules, a ZFS-specific dashboard, and TLS/auth in front of the metrics endpoint
+
 ## 2026 — Camera NVR with Frigate
 - Deployed Frigate (0.17.2) on TrueNAS to record a Tapo C200's RTSP stream to the ZFS pool, retiring the camera's SD card as primary storage and keeping footage off the vendor cloud
 - Chose Frigate over plain ffmpeg/go2rtc so future person detection is a config change rather than a stack migration
