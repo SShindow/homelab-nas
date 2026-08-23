@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 830" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="830" fill="#0f172a"/>
+<svg viewBox="0 0 900 960" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="960" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -96,6 +96,17 @@
     <text x="60" y="756" fill="#64748b" font-size="11">Line: ~155–170 Mbps upstream (international) · ~439 Mbps domestic · tunnel adds no measurable throughput penalty</text>
   </g>
 
-  <text x="450" y="790" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
-  <text x="450" y="808" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
+  
+  <!-- Camera NVR -->
+  <g>
+    <rect x="40" y="778" width="820" height="118" rx="10" fill="#1e293b" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="60" y="806" fill="#fbcfe8" font-size="14" font-weight="700">📹 Camera NVR (Frigate)</text>
+    <text x="60" y="830" fill="#e2e8f0" font-size="12">Tapo C200 --RTSP--&gt; go2rtc --&gt; Frigate --&gt; ZFS pool. No vendor cloud, no SD card as primary storage.</text>
+    <text x="60" y="850" fill="#94a3b8" font-size="11">Dual stream: 1080p record + 640x360 detect/audio · retention 7d continuous / 30d motion · DHCP-reserved camera IP</text>
+    <text x="60" y="868" fill="#94a3b8" font-size="11">Reboot resilience verified from outside the LAN over Tailscale: NAS boot to live video, zero manual steps</text>
+    <text x="60" y="886" fill="#64748b" font-size="11">319 MiB/hour per camera vs 80.2 MB/s pool write ceiling (&lt;1%) · 13-15% CPU · remote live view about 1.42 Mbps</text>
+  </g>
+
+  <text x="450" y="920" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="938" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>

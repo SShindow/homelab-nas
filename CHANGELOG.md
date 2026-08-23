@@ -6,6 +6,18 @@ All notable changes to this project are documented here, in the order they were 
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - Jellyfin media server setup
 
+## 2026 — Camera NVR with Frigate
+- Deployed Frigate (0.17.2) on TrueNAS to record a Tapo C200's RTSP stream to the ZFS pool, retiring the camera's SD card as primary storage and keeping footage off the vendor cloud
+- Chose Frigate over plain ffmpeg/go2rtc so future person detection is a config change rather than a stack migration
+- Dual-stream setup through go2rtc: 1080p for recording, 640×360 for detection/audio, with connection reduction enabled
+- Worked around a Tapo/Frigate ONVIF incompatibility ("No RTSP URLs found") using a literal RTSP URL; documented the Tapo's real ONVIF port (2020) and the separate local Camera Account requirement
+- Worked around the TrueNAS + Frigate first-login password bug via `auth.reset_admin_password`
+- Pinned the camera's IP with a DHCP reservation so a lease change can't silently break the RTSP source
+- Verified full reboot resilience end to end, checked from outside the LAN over Tailscale
+- Benchmarked the stack: 80.2 MB/s baseline ZFS write, 319.19 MiB/hour per camera, 13-15% CPU, ~1.42 Mbps for remote live view
+- Corrected an invalid `dd if=/dev/zero` disk benchmark that was measuring lz4 compression rather than disk throughput, and discarded a remote-bandwidth sample contaminated by a mid-test network switch
+- Deferred: person/stranger detection pending a Coral USB TPU; hard VLAN isolation of the camera
+
 ## 2026 — Tailscale Exit Node (Personal VPN)
 - Configured the NAS as a Tailscale exit node, so client devices can route their full internet connection out through the home line
 - Enabled `net.ipv4.ip_forward` and `net.ipv6.conf.all.forwarding` as TrueNAS sysctl tunables

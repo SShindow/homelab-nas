@@ -30,6 +30,7 @@ This is a living project — new capabilities are added and documented increment
 | Cloud Backup | TrueNAS Cloud Sync Task (rclone) — Google Drive → NAS |
 | Local Point-in-Time Recovery | ZFS periodic snapshots (daily + weekly) |
 | Personal VPN / Internet Egress | Tailscale Exit Node (NAS advertises `0.0.0.0/0` + `::/0`) |
+| Video Surveillance / NVR | Frigate (RTSP from Tapo C200, recorded to the ZFS pool) |
 
 See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
@@ -41,6 +42,7 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 - Storage: 2x 2TB Seagate HDD (mirrored ZFS pool), 128GB Kingston SSD (boot/OS)
 - GPU: GTX 650 (available but not currently installed — power draw vs. hardware transcoding tradeoff still under evaluation)
 - Router: ISP-issued GPON ONT (no WAN-side Wake-on-LAN support)
+- Camera: TP-Link Tapo C200 (1080p, RTSP), Wi-Fi, recording to the NAS rather than its 32GB SD card
 
 **Deployment note:** the NAS is physically hosted at a remote location (family home) and administered entirely over the network — all setup, testing, and troubleshooting shown here was done remotely, with family assisting on-site only for physical steps (e.g., swapping hardware).
 
@@ -280,6 +282,118 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 
 **Status:** ✅ Operational and verified — exit node advertised, approved, and confirmed carrying client traffic by ASN change, with no DNS leak and no measurable throughput penalty. Cross-country verification from Europe still pending.
 
+## Module: Camera NVR with Frigate
+
+**Goal:** Record a TP-Link Tapo C200's RTSP stream onto the NAS's ZFS pool, retiring the camera's 32 GB SD card as primary storage — and keep the footage off the vendor's cloud. A secondary goal was to collect real performance numbers rather than trusting the setup wizard's estimates.
+
+**Why Frigate rather than plain ffmpeg or go2rtc alone:** all three can pull RTSP and write files. Frigate was chosen because person/object detection is a later goal, and with Frigate that becomes a config change rather than a migration to a different recording stack. Paying a small complexity cost now to avoid re-platforming later.
+
+**Cloud isolation — deliberately "soft":** no Tapo Care subscription, no cloud recording, RTSP straight to the NAS. The camera is *not* firewalled or VLAN-isolated from the internet at this stage. That's an honest limitation rather than an oversight: the recording path is fully local, but the camera can still reach TP-Link. Hard isolation (VLAN + egress block) is a future improvement.
+
+### Deployment
+
+| Item | Value |
+|---|---|
+| App | Frigate via TrueNAS Apps catalog |
+| Image | `ghcr.io/blakeblackshear/frigate:0.17.2` |
+| Container | `ix-frigate-frigate-1` |
+| Config | `/mnt/.ix-apps/app_mounts/frigate/config/config.yaml` (`.yaml`, not `.yml`) |
+| Web UI | host port `30193`, reachable remotely over Tailscale |
+
+**Camera configuration:** camera key `tapo_c200`, using both of the camera's streams for different jobs:
+
+| Stream | Resolution | Roles |
+|---|---|---|
+| `tapo_c200_1` | 1920×1080 | `record` |
+| `tapo_c200_2` | 640×360 | `detect`, `audio` |
+
+Both are restreamed through **go2rtc** with *Reduce connections to camera* enabled — a small CPU cost accepted in exchange for fewer redundant RTSP connections to a camera that doesn't handle them gracefully.
+
+**Retention:** continuous 7 days, motion 30 days. At the measured ~11.8 GB/day that's roughly 83 GB — comfortable against 1.69 TiB free.
+
+### Problems hit during setup
+
+Four of these cost real time and none of them are documented clearly upstream, so they're recorded here in full.
+
+**1. App install appears to hang at 60%.** Transient and self-resolving on TrueNAS SCALE — no intervention needed. Worth knowing before you start killing and reinstalling the app.
+
+**2. The first-login admin password never appears in the logs.** A known TrueNAS SCALE + Frigate interaction. Fix:
+
+```yaml
+# config.yaml — top-level key
+auth:
+  reset_admin_password: true
+```
+
+Restart the container and watch the logs live to catch the generated password as it scrolls past:
+
+```bash
+sudo docker logs -f ix-frigate-frigate-1
+```
+
+> **Set `reset_admin_password: false` again immediately afterwards.** Left enabled, it regenerates a new unknown password on every restart — turning a one-time annoyance into a permanent one.
+
+**3. ONVIF auto-probe fails against the Tapo C200** — the camera wizard's *Probe camera* option returns "No RTSP URLs found." This is a known Tapo/Frigate ONVIF incompatibility, not a misconfiguration, and no amount of retrying fixes it. Workaround: **Manual selection → brand "Other" → paste the literal RTSP URL.** Also worth recording for anyone revisiting ONVIF: the Tapo's actual ONVIF port is **2020**, not the wizard's default placeholder of 80.
+
+**4. RTSP authentication requires a *local* camera account.** The Tapo cloud login is not the RTSP credential. A separate "Camera Account" must be created in the Tapo mobile app under **Advanced Settings**; that username/password is what the RTSP URL refers to.
+
+**Config gotcha:** in Frigate v0.17, `record.continuous` and `record.motion` accept only a `days` field — there is **no `mode` field** at that level. `mode` exists only under `alerts.retain` / `detections.retain`, which belong to the object-detection review system. Adding it under continuous/motion fails config validation.
+
+### Reliability hardening
+
+**Static addressing.** The camera's IP is pinned by DHCP reservation on the router (VNPT iGate GW040-NS → **Network → LAN → DHCP Reservation**), binding the camera's MAC to `192.168.1.9`. Without this, a lease change after a power cut would silently break the RTSP URL while everything else looked healthy. *(The router's UI requires colon-separated MAC notation — hyphens are rejected.)*
+
+**Full reboot-resilience test — PASSED.** The whole NAS was rebooted, then verified **remotely over Tailscale** (MacBook tethered to phone cellular data, using the Tailscale address rather than the LAN one) that Frigate's web UI loaded *and* the camera tile showed live video.
+
+That single check exercises the entire chain unattended: NAS boots → Docker starts → Frigate container comes up → camera rejoins Wi-Fi on its reserved IP → Frigate re-establishes RTSP → Tailscale reconnects. Zero manual intervention at any step. Testing it from a non-LAN network mattered — checking from inside the house would have proven considerably less.
+
+### Performance
+
+| Measurement | Result |
+|---|---|
+| Baseline ZFS sequential write | **80.2 MB/s** (disk-bound) |
+| Frigate recording bandwidth, 1 camera | **319.19 MiB/hour** (~90.7 KB/s) |
+| Frigate CPU load, sustained recording | **13–15%** total on the Pentium G3240 |
+| Detector inference (CPU-based, no Coral) | 10 ms |
+| Remote live-view over Tailscale | ~176.9 KB/s down / ~3.1 KB/s up (**≈1.42 Mbps**) |
+
+**Benchmarking methodology matters more than the numbers — a worked example.** The obvious disk benchmark is wrong on this pool:
+
+```bash
+# WRONG on a pool with lz4 compression — reports 3+ GB/s
+dd if=/dev/zero of=/mnt/tank/test bs=1M count=20000
+
+# Correct: incompressible data, forced sync, larger than the 16 GB of RAM
+dd if=/dev/urandom of=/mnt/tank/test bs=1M count=20000 conv=fdatasync
+```
+
+`lz4` is inherited pool-wide, so an all-zero input compresses to almost nothing and the "throughput" figure measures the compressor, not the disks. It reported 3+ GB/s regardless of file size — implausible for two mechanical drives, which is what gave it away. Switching to `/dev/urandom` with `conv=fdatasync`, at a size exceeding RAM so the ARC can't absorb it, produced the real **80.2 MB/s**.
+
+**Headroom:** one camera consumes well under 1% of the disk's write throughput. Storage is nowhere near a bottleneck; this box could record many more cameras before disk I/O mattered. Notably the measured 319.19 MiB/hour also came in well below the camera-add wizard's pre-tuning estimate of ~480 MiB/hour, so the dual-stream + go2rtc configuration paid off.
+
+**A measurement thrown out.** The first remote live-view figure was invalid: the "before" and "after" byte counters straddled an unnoticed switch from cellular to home Wi-Fi mid-test, visible afterwards as an implausible 3× jump in instantaneous receive rate between the two readings. Redone with the connection state confirmed throughout and a genuine 134-second sample (cross-checked against the camera's on-screen clock overlay). Worth stating plainly: a measurement whose conditions changed underneath it is not a conservative measurement, it's a wrong one.
+
+That ~1.42 Mbps is application-level data for one modest-bitrate stream — it is **not** comparable to the exit node's link-saturation speedtest figures (18–27 Mbps). Different question, different measurement.
+
+**Open watch item:** Frigate flags `/dev/shm` (64 MB) as below its recommended 126 MB minimum. Actual usage is ~1.6 MB, so there's no practical pressure, and the TrueNAS SCALE 25.10-specific fix could not be confirmed — a community thread on the same version was redirected to a separate unresolved support thread. Parked deliberately rather than chased.
+
+### Known limitations
+
+- **Cloud isolation is soft** — no cloud recording or subscription, but the camera is not blocked from reaching TP-Link.
+- **No person/object detection yet.** Detection runs on CPU; reliable person/stranger alerting needs a Coral USB TPU (~$60–70), not yet purchased. The Frigate choice means adding it is a config change.
+- **Recording depends on the camera's Wi-Fi.** A wired camera would remove a failure mode, but placement won.
+- **Single copy.** Footage lives on the ZFS mirror — redundant against a disk failure, but it is not backed up off-site the way the Google Drive dataset is.
+- **Cross-country access is unverified.** Remote viewing was tested from cellular *within Vietnam*; a real Germany↔Vietnam figure is still pending.
+
+**Status:** ✅ Operational — recording continuously to the ZFS pool, surviving full reboots unattended, benchmarked end to end, and reachable remotely over Tailscale. Vendor cloud carries none of the footage.
+
+<!-- Screenshots to add under docs/img/ — uncomment once committed:
+![Frigate camera live view](docs/img/frigate-live-view.png)
+![Frigate System page — CPU and detector load](docs/img/frigate-system.png)
+![Frigate Storage page — recording bandwidth](docs/img/frigate-storage.png)
+![DHCP reservation for the camera](docs/img/frigate-dhcp-reservation.png)
+-->
+
 ## Key Challenges & Fixes
 
 | Problem | Root Cause | Fix |
@@ -291,6 +405,10 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 | NAS didn't power back on after a full home power cut, even with "Restore AC Power Loss" set | Failing CMOS battery — only exposed by full power cuts, since graceful shutdowns rely on PSU standby power instead | Replaced the CR2032 CMOS battery; verified with a real fuse-cut test |
 | Tailscale's "Advertise Exit Node" checkbox had no effect — the node never appeared as an exit node at all | Container was already authenticated (`Auth Once`), so `containerboot` applies settings via `tailscale set`, which silently ignores `--advertise-exit-node` from `TS_EXTRA_ARGS` ([upstream bug](https://github.com/tailscale/tailscale/issues/14496)) | Applied the flag directly to the daemon: `tailscale set --advertise-exit-node`; added a post-upgrade check to the runbook |
 | Userspace networking (used in the original Tailscale install) cannot support exit-node routing | In Userspace mode Tailscale runs its own TCP/IP stack inside the container and never touches host routing, so it can't forward other devices' traffic | Disabled Userspace, enabled Host Network, and set the IPv4/IPv6 forwarding sysctls |
+| Frigate's ONVIF auto-probe returned "No RTSP URLs found" for the Tapo C200 | Known Tapo/Frigate ONVIF incompatibility — not a config error | Manual selection → brand "Other" → literal RTSP URL. (Tapo's real ONVIF port is 2020, not the wizard's default of 80) |
+| Frigate's first-login admin password never appeared in the container logs | Known TrueNAS SCALE + Frigate interaction | Set `auth.reset_admin_password: true`, restart, watch `docker logs -f` live to catch it — then set it back to `false` or it regenerates every restart |
+| RTSP authentication rejected the Tapo cloud credentials | RTSP uses a separate local "Camera Account", not the cloud login | Created the Camera Account in the Tapo app under Advanced Settings |
+| Disk benchmark reported an impossible 3+ GB/s on two mechanical drives | `dd if=/dev/zero` on a pool with inherited lz4 compression measures the compressor, not the disks | Benchmarked with `/dev/urandom` + `conv=fdatasync` at a size larger than RAM — real figure 80.2 MB/s |
 
 ## Results
 
@@ -298,6 +416,7 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 - Storage is redundant via ZFS mirroring, protecting against single-disk failure.
 - Setup survives reboots and power interruptions without manual intervention.
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty.
+- The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps for one stream.
 
 ## Lessons Learned
 
@@ -310,12 +429,17 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 - A test that cannot fail isn't a test. Checking a public IP while sitting on the same network as the exit node would have "passed" whether or not the feature worked; comparing ASNs across two genuinely different access networks was what made the result mean something.
 - Domestic and international throughput on the same line differed by ~2.5×. Benchmark against the path that matches the real use case, not the one that produces the nicer number.
 - Configuration applied outside a management UI becomes invisible to that UI's rebuild path. The `tailscale set` workaround works, but it would vanish on a rebuild — which makes it a runbook item, not a one-time fix.
+- A benchmark can be confidently wrong. `dd if=/dev/zero` on an lz4-compressed ZFS pool measures compression, not disk throughput — and the giveaway was that the result was *too good* (3+ GB/s from two mechanical drives). Implausibly good numbers deserve the same scrutiny as bad ones.
+- Measurement conditions have to hold still for the whole sample. A remote-bandwidth reading was discarded because the laptop silently switched from cellular to Wi-Fi mid-test; the error showed up as a 3× jump between two readings that should have matched.
+- Reboot resilience is only proven if it's verified from outside the LAN. Checking from inside the house would have skipped the Tailscale reconnect and the camera's Wi-Fi rejoin — the two links most likely to fail unattended.
 
 ## Future Improvements
 
 - [x] ~~Automated off-site/cloud backup of critical datasets~~ → done via Cloud Sync Task (see above)
 - [x] ~~Unattended recovery from a full power outage~~ → done via CMOS battery fix (see above)
 - [x] ~~ZFS snapshot strategy for point-in-time recovery~~ → done via daily/weekly periodic snapshots (see above)
+- [x] ~~Personal VPN / self-hosted internet egress~~ → done via Tailscale exit node (see above)
+- [x] ~~Local-only camera recording, off the vendor cloud~~ → done via Frigate NVR (see above)
 - [ ] GTX 650 reinstallation for Jellyfin hardware transcoding — evaluating whether the transcoding benefit is worth the added power draw
 - [ ] Jellyfin media server setup
 - [ ] True live 2-way sync (`rclone bisync` + cron) — only if convenience outweighs backup-safety tradeoff
@@ -327,7 +451,12 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 - [ ] Tailscale ACLs / auto-approvers so routes re-advertise without manual approval after a rebuild
 - [ ] SQM / fq_codel on the router to reduce bufferbloat under load
 - [ ] Cross-country verification of the exit node from Europe
+- [ ] Coral USB TPU for person/stranger detection and alerting (currently CPU detection only)
+- [ ] Hard camera isolation — VLAN + egress block, so the camera cannot reach TP-Link at all
+- [ ] Set up the second Tapo C200 in Germany
+- [ ] Resolve the Frigate `/dev/shm` size warning on TrueNAS SCALE 25.10
+- [ ] Cross-country verification of Frigate remote viewing from Europe
 
 ---
 
-**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync)
+**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR)
