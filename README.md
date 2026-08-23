@@ -309,6 +309,9 @@ Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains bo
 
 Both are restreamed through **go2rtc** with *Reduce connections to camera* enabled — a small CPU cost accepted in exchange for fewer redundant RTSP connections to a camera that doesn't handle them gracefully.
 
+![Frigate live view](docs/img/frigate-live-view.png)
+*Live tile served by Frigate. The camera is aimed at a blank wall for this screenshot — the point is the pipeline, not the room.*
+
 **Retention:** continuous 7 days, motion 30 days. At the measured ~11.8 GB/day that's roughly 83 GB — comfortable against 1.69 TiB free.
 
 ### Problems hit during setup
@@ -343,6 +346,8 @@ sudo docker logs -f ix-frigate-frigate-1
 
 **Static addressing.** The camera's IP is pinned by DHCP reservation on the router (VNPT iGate GW040-NS → **Network → LAN → DHCP Reservation**), binding the camera's MAC to `192.168.1.9`. Without this, a lease change after a power cut would silently break the RTSP URL while everything else looked healthy. *(The router's UI requires colon-separated MAC notation — hyphens are rejected.)*
 
+![DHCP reservation for the camera](docs/img/frigate-dhcp-reservation.png)
+
 **Full reboot-resilience test — PASSED.** The whole NAS was rebooted, then verified **remotely over Tailscale** (MacBook tethered to phone cellular data, using the Tailscale address rather than the LAN one) that Frigate's web UI loaded *and* the camera tile showed live video.
 
 That single check exercises the entire chain unattended: NAS boots → Docker starts → Frigate container comes up → camera rejoins Wi-Fi on its reserved IP → Frigate re-establishes RTSP → Tailscale reconnects. Zero manual intervention at any step. Testing it from a non-LAN network mattered — checking from inside the house would have proven considerably less.
@@ -356,6 +361,12 @@ That single check exercises the entire chain unattended: NAS boots → Docker st
 | Frigate CPU load, sustained recording | **13–15%** total on the Pentium G3240 |
 | Detector inference (CPU-based, no Coral) | 10 ms |
 | Remote live-view over Tailscale | ~176.9 KB/s down / ~3.1 KB/s up (**≈1.42 Mbps**) |
+
+![Frigate System page](docs/img/frigate-system.png)
+*Detector inference at 10 ms, total CPU 14% while recording.*
+
+![Frigate Storage page](docs/img/frigate-storage.png)
+*319.19 MiB/hour for one camera against 1.69 TiB free — and the `/dev/shm` warning, visible bottom right.*
 
 **Benchmarking methodology matters more than the numbers — a worked example.** The obvious disk benchmark is wrong on this pool:
 
@@ -375,7 +386,7 @@ dd if=/dev/urandom of=/mnt/tank/test bs=1M count=20000 conv=fdatasync
 
 That ~1.42 Mbps is application-level data for one modest-bitrate stream — it is **not** comparable to the exit node's link-saturation speedtest figures (18–27 Mbps). Different question, different measurement.
 
-**Open watch item:** Frigate flags `/dev/shm` (64 MB) as below its recommended 126 MB minimum. Actual usage is ~1.6 MB, so there's no practical pressure, and the TrueNAS SCALE 25.10-specific fix could not be confirmed — a community thread on the same version was redirected to a separate unresolved support thread. Parked deliberately rather than chased.
+**Open watch item:** Frigate flags `/dev/shm` (64 MB) as below its recommended 126 MB minimum. Actual usage sits at a few MiB of the 64 MB allocated, so there's no practical pressure, and the TrueNAS SCALE 25.10-specific fix could not be confirmed — a community thread on the same version was redirected to a separate unresolved support thread. Parked deliberately rather than chased.
 
 ### Known limitations
 
@@ -387,12 +398,6 @@ That ~1.42 Mbps is application-level data for one modest-bitrate stream — it i
 
 **Status:** ✅ Operational — recording continuously to the ZFS pool, surviving full reboots unattended, benchmarked end to end, and reachable remotely over Tailscale. Vendor cloud carries none of the footage.
 
-<!-- Screenshots to add under docs/img/ — uncomment once committed:
-![Frigate camera live view](docs/img/frigate-live-view.png)
-![Frigate System page — CPU and detector load](docs/img/frigate-system.png)
-![Frigate Storage page — recording bandwidth](docs/img/frigate-storage.png)
-![DHCP reservation for the camera](docs/img/frigate-dhcp-reservation.png)
--->
 
 ## Key Challenges & Fixes
 
