@@ -44,6 +44,9 @@ It exposes roughly **2,770 `node_*` metrics** on `:9100`.
 nohup /mnt/tank/node_exporter-1.9.0.linux-amd64/node_exporter > /dev/null 2>&1 &
 ```
 
+![Post Init script launching node_exporter](img/truenas-post-init-script.png)
+*The auto-start mechanism behind the reboot test — otherwise an invisible piece of configuration.*
+
 **Prometheus config on a host path, not ixVolume.** A dedicated dataset `tank/prometheus-config` — a sibling of `swimming-pool`, placed deliberately *outside* the `sshindow-private` snapshot scope so monitoring config doesn't ride along in personal-data snapshots. Owned `568:568` (the apps user), mounted via Storage Configuration → Prometheus Config Storage → **Host Path**.
 
 Retention `30d`. The TSDB itself was left on ixVolume — time-series data here is disposable, and losing it costs history, not configuration.
@@ -70,6 +73,14 @@ Both UIs are reachable remotely over Tailscale (Prometheus `:30104`, Grafana `:3
 **Full NAS reboot, passed unattended.** The Post Init script fired, node_exporter came back on its own, and both scrape targets returned **UP** with no manual intervention. That's the check that matters for a host binary launched by a startup script — the mechanism most likely to silently not fire.
 
 **First real readings**, taken shortly after boot with Frigate recording: CPU ~43.8% busy, load 25.5%, RAM 26.8% of 16 GiB, root filesystem 0.1%. No swap configured, which is normal for this setup.
+
+![Prometheus target health — both jobs UP](img/prometheus-targets-up.png)
+*Both scrape pools healthy — the direct counterpart to the "No scrape pools found" state a fresh install starts in.*
+
+<!-- Add once a week of history has accumulated — crop to the Quick CPU/Mem/Disk row plus a time-series panel, range set to 7d:
+![Grafana — Node Exporter Full](img/grafana-node-exporter-dashboard.png)
+*A week of history: the day/night cycle and Frigate's steady recording load as a visible baseline.*
+-->
 
 ## Known limitation — stated plainly
 
