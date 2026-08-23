@@ -6,8 +6,8 @@
   <!-- Client devices -->
   <g>
     <rect x="40" y="90" width="180" height="70" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
-    <text x="130" y="120" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="600">Windows Laptop</text>
-    <text x="130" y="140" text-anchor="middle" fill="#94a3b8" font-size="12">Mapped Drive Z:</text>
+    <text x="130" y="120" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="600">MacBook Air M2</text>
+    <text x="130" y="140" text-anchor="middle" fill="#94a3b8" font-size="12">Finder (SMB)</text>
 
     <rect x="40" y="190" width="180" height="70" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
     <text x="130" y="220" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="600">iPhone</text>
@@ -16,6 +16,14 @@
     <rect x="40" y="290" width="180" height="70" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
     <text x="130" y="320" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="600">Galaxy Tab S7</text>
     <text x="130" y="340" text-anchor="middle" fill="#94a3b8" font-size="12">My Files (SMB)</text>
+  </g>
+
+  
+  <!-- Planned client -->
+  <g opacity="0.55">
+    <rect x="40" y="368" width="180" height="60" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="130" y="393" text-anchor="middle" fill="#cbd5e1" font-size="14" font-weight="600">Windows Gaming PC</text>
+    <text x="130" y="412" text-anchor="middle" fill="#94a3b8" font-size="11">planned</text>
   </g>
 
   <text x="230" y="180" fill="#64748b" font-size="12">(different countries /</text>

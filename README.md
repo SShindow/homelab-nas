@@ -10,7 +10,7 @@ I wanted reliable, secure access to personal files across countries and devices 
 
 **Goals:**
 - Centralized, redundant file storage at home
-- Secure remote access from Windows, iOS, and Android
+- Secure remote access from macOS, iOS, and Android
 - No reliance on commercial cloud storage
 - Persistent, low-maintenance setup that survives reboots
 - Automated backup of critical cloud files (Google Drive) to local storage
@@ -26,7 +26,7 @@ This is a living project — new capabilities are added and documented increment
 | OS Drive | Dedicated SSD |
 | Remote Access | Tailscale (WireGuard-based mesh VPN) |
 | File Sharing Protocol | SMB (Samba) |
-| Clients | Windows, iOS, Android |
+| Clients | macOS, iOS, Android (Windows planned) |
 | Cloud Backup | TrueNAS Cloud Sync Task (rclone) — Google Drive → NAS |
 | Local Point-in-Time Recovery | ZFS periodic snapshots (daily + weekly) |
 | Personal VPN / Internet Egress | Tailscale Exit Node (NAS advertises `0.0.0.0/0` + `::/0`) |
@@ -57,7 +57,7 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 5. **Register the NAS as a persistent Tailscale node** using a *reusable*, *non-ephemeral* auth key — this ensures the machine doesn't drop off the network after a reboot.
 6. **Create an SMB share** and expose it to the local network / Tailscale mesh.
 7. **Connect each client device:**
-   - **Windows:** Mapped the share as a persistent drive (`Z:`) with "Reconnect at sign-in" enabled.
+   - **macOS (MacBook Air M2):** Connected via Finder → Go → Connect to Server → `smb://<tailscale-ip>/<share-name>`, saved to Favourites so it remounts on demand.
    - **iPhone:** Connected via the Files app using `smb://<tailscale-ip>/<share-name>`.
    - **Android (Galaxy Tab S7):** Connected via My Files → Network Storage → Add manually, using SMBv2/SMBv3 and the Tailscale IP.
 8. **Verified persistence** — confirmed TrueNAS apps auto-restart correctly after a full reboot.
@@ -97,7 +97,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 
 ## Results
 
-- All three client devices (Windows, iOS, Android) reliably connect to the NAS over Tailscale from outside the home network.
+- All three client devices (macOS, iOS, Android) reliably connect to the NAS over Tailscale from outside the home network.
 - Storage is redundant via ZFS mirroring, protecting against single-disk failure.
 - Setup survives reboots and power interruptions without manual intervention.
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty.
@@ -147,6 +147,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Coral USB TPU for person/stranger detection and alerting (currently CPU detection only)
 - [ ] Hard camera isolation — VLAN + egress block, so the camera cannot reach TP-Link at all
 - [ ] Set up the second Tapo C200 in Germany
+- [ ] Add the incoming Windows gaming PC as a fourth SMB client, and as a Syncthing peer alongside the MacBook
 - [ ] Resolve the Frigate `/dev/shm` size warning on TrueNAS SCALE 25.10
 - [ ] Cross-country verification of Frigate remote viewing from Europe
 

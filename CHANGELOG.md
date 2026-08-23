@@ -6,6 +6,11 @@ All notable changes to this project are documented here, in the order they were 
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - Jellyfin media server setup
 
+## 2026 — Client lineup change
+- Replaced the Windows laptop with a MacBook Air M2; the Mac now mounts the SMB share over Tailscale via Finder
+- Documentation updated to reflect macOS/iOS/Android as the current client set
+- A Windows gaming PC is planned and will be added as a fourth client
+
 ## 2026 — Observability with Prometheus + Grafana
 - Deployed Prometheus and Grafana on TrueNAS, with node_exporter v1.9.0 installed as a host binary rather than a container so the ZFS collector and host /proc, /sys visibility are retained
 - Worked out that TrueNAS assigns Prometheus a non-default port (30104), ships it with an empty scrape config, and bundles no exporter — none of the standard setup guides apply unmodified
