@@ -15,3 +15,8 @@ Thumbs.db
 
 # Local scratch/config exports that may contain sensitive paths or IPs
 configs/*.local.*
+
+# Tailscale / API keys — never commit these
+*tskey*
+*authkey*
+*.token
