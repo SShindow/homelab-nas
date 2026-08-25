@@ -23,6 +23,9 @@ Two deliberate decisions here.
 
 **Config lives on a host path, not ixVolume** — the same lesson as the [observability module](monitoring-prometheus-grafana.md), but with higher stakes. Losing Prometheus config costs a re-typed YAML file. Losing Jellyfin config costs the admin account, the library structure, and all watch history.
 
+![Dataset layout on the pool](img/jellyfin-datasets.png)
+*`media` (35.85 GiB) and `jellyfin-config` sit at the top of the pool beside `prometheus-config`, while `swimming-pool` — the snapshotted, SMB-shared private data — stays separate. The split is the point: the library is large and replaceable, the config is tiny and irreplaceable.*
+
 ### Moving 35 GB in zero seconds
 
 The library started inside the private dataset and needed to move out. The naive approach copies 35 GB across the pool. The correct one:
@@ -103,6 +106,44 @@ Because the [Prometheus/Grafana stack](monitoring-prometheus-grafana.md) was alr
 | I/O | 3.1% |
 
 **Purely compute-bound.** Memory and disk are untouched; the CPU is saturated. That single reading is what turned "should I add a GPU?" from a preference into a decision with evidence behind it — and it's the observability module earning its place two weeks after being built.
+
+![Grafana during a browser transcode](img/jellyfin-transcode-grafana.png)
+*The whole argument in one frame: CPU busy 95.9% and CPU pressure 88.4%, while memory pressure sits at 0.0% and I/O at 3.1%. A GPU accelerates the saturated resource — here that is the CPU's encode work, and only for a case the native client avoids entirely.*
+
+### What the transcode actually is
+
+`ps aux | grep ffmpeg` shows nothing during playback, so the evidence comes from the container's own logs:
+
+```bash
+sudo docker logs --tail 200 ix-jellyfin-jellyfin-1 2>&1 | grep -i "ffmpeg\|transcod"
+```
+
+```
+MediaBrowser.MediaEncoding.Transcoding.TranscodeManager:
+/usr/lib/jellyfin-ffmpeg/ffmpeg -analyzeduration 200M -probesize 1G
+  -ss 00:12:45.765 -i file:"/media/tv/<series>/Season 01/<series> - S01E01.avi"
+  -map_metadata -1 -map_chapters -1 -threads 0 -map 0:0 -map 0:1 -map -0:s
+  -codec:v:0 libx264 -preset veryfast -crf 23 -maxrate 4790804 -bufsize 9581608
+  -profile:v:0 high -level 51
+  -x264opts:0 subme=0:me_range=16:rc_lookahead=10:me=hex:open_gop=0
+  -force_key_frames:0 "expr:gte(t,n_forced*3)" -sc_threshold:v:0 0
+  -vf "...,scale=trunc(min(max(iw,ih*a),min(576,432*a))/2)*2:
+        trunc(min(max(iw/a,ih),min(576/a,432))/2)*2,format=yuv420p"
+  -codec:a:0 copy
+  -f hls -hls_time 3 -hls_segment_type mpegts -hls_playlist_type vod
+  -hls_segment_filename "/cache/transcodes/<id>%d.ts" -y "/cache/transcodes/<id>.m3u8"
+```
+
+Five things in that command line are worth reading closely:
+
+- **`-codec:a:0 copy`** — audio is passed through untouched. Only the *video* is re-encoded, which is exactly why Grafana showed the load as pure CPU with no I/O component.
+- **`-preset veryfast`** — Jellyfin already selects one of the fastest x264 presets, and it *still* saturates the CPU. There is no tuning headroom left to reclaim; the encoder is not being asked to work hard for quality's sake.
+- **`-threads 0`** — ffmpeg takes every core available. That matches the observed load of 243.5% on a dual-core CPU: both cores pinned, with runnable processes queued behind them.
+- **`-f hls -hls_time 3`** — output is segmented into three-second HLS chunks. This is the mechanism behind the `ps aux` gotcha: ffmpeg races ahead of playback, writes a batch of segments, exits, and is respawned later. Polling the process table catches the gaps far more often than the work.
+- **`scale=...min(576,432*a)...`** — the downscale to **576×432** is written into the filter chain, confirming what the client negotiated rather than what was assumed.
+
+The log also shows `FFmpeg exited with code 0` repeatedly between invocations — the same burst-and-exit pattern, visible from the other side.
+
 
 ### Why the GTX 650 stays out
 
