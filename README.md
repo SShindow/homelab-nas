@@ -42,7 +42,7 @@ See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 - RAM: 16GB DDR3
 - Motherboard: ASUS H81M-D (BIOS v2106)
 - Storage: 2x 2TB Seagate HDD (mirrored ZFS pool), 128GB Kingston SSD (boot/OS)
-- GPU: GTX 650 (available but not currently installed — power draw vs. hardware transcoding tradeoff still under evaluation)
+- GPU: GTX 650 (available but **not installed** — evaluated for hardware transcoding and rejected on four grounds; see [Media Streaming](docs/media-jellyfin.md))
 - Router: ISP-issued GPON ONT (no WAN-side Wake-on-LAN support)
 - Camera: TP-Link Tapo C200 (1080p, RTSP), Wi-Fi, recording to the NAS rather than its 32GB SD card
 
@@ -102,7 +102,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 
 ## Results
 
-- Client devices across macOS, iOS and Android reliably connect to the NAS over Tailscale from outside the home network; a Windows gaming PC joins the same mesh.
+- Client devices across macOS, iOS and Android reliably connect to the NAS over Tailscale from outside the home network.
 - Storage is redundant via ZFS mirroring, protecting against single-disk failure.
 - Setup survives reboots and power interruptions without manual intervention.
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty.

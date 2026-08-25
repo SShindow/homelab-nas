@@ -67,7 +67,9 @@ The second recovery is the one that matters:
 
 That is the [snapshot module](zfs-snapshots.md) paying for itself, and it's also the argument for *layered* retention rather than a single schedule. A 7-day daily policy alone would have been enough — but only just, and only because the mistake was noticed quickly. The weekly tier is what actually caught it.
 
-It's also a live demonstration of the tradeoff above: the media library is outside the snapshot scope by design, so this safety net existed **only because the files were still inside the private dataset at the time**. After the `zfs rename`, that protection no longer applies to the library.
+It's also a live demonstration of the tradeoff above — but not in the obvious direction. The deletions happened after the zfs rename, at /mnt/tank/media/. Recovery worked because snapshots travel with a dataset through a rename: all seven inherited snapshots came along and remained readable under /mnt/tank/media/.zfs/snapshot/.
+
+The catch is that this safety net is decaying. No periodic task creates new snapshots on tank/media — that was the entire point of promoting it out of sshindow-private. The inherited ones age out on their original schedule (7-day dailies, 4-week weeklies), so within a month the library has no local recovery layer at all. That's the intended trade for a replaceable 35 GB library, but it's a deliberate choice with an expiry date, not a permanent state.
 
 ## Jellyfin configuration
 
@@ -154,7 +156,7 @@ The spare GTX 650 was evaluated for hardware transcoding and **rejected on four 
 3. **It wouldn't help Frigate either.** Frigate's detectors need compute capability 5.0+; Kepler is 3.0.
 4. **The problem quadrant disappears for free.** Using the native client instead of a browser eliminates the only transcoding case that exists.
 
-**Intel Quick Sync is the chosen path instead of a discrete card.** The G3240's Haswell iGPU covers the same H.264 encode ground the GTX 650 would have, with no PCIe card, no extra idle draw, and no NVIDIA-driver-on-SCALE problem. Two caveats are recorded rather than assumed away:
+**Intel Quick Sync is the fallback if transcoding ever becomes necessary — it is not currently enabled.** The G3240's Haswell iGPU covers the same H.264 encode ground the GTX 650 would have, with no PCIe card, no extra idle draw, and no NVIDIA-driver-on-SCALE problem. Two caveats are recorded rather than assumed away:
 
 - **The measured transcode above used `-codec:v:0 libx264` — a software encoder.** Hardware encoding appears as `h264_qsv`. So QSV was *not* in the path when that measurement was taken, and the 95.9% CPU figure is a software-encode number.
 - **Haswell sits well outside Jellyfin's supported range for QSV.** The project's hardware guidance recommends 11th-gen or newer and notes that 7th–10th gen have been deprecated by Intel; a 4th-gen Pentium-tier part is several steps further back.
