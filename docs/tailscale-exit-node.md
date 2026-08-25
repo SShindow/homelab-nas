@@ -168,6 +168,8 @@ The practical result: the home router's admin interface is now reachable from an
 ![Subnet route approved in the Tailscale admin console](img/tailscale-subnet-route-approved.png)
 *The node now carries both badges — `Subnets` and `Exit Node` — with `192.168.1.0/24` approved and nothing left awaiting approval.*
 
+As with the exit node itself, this proves the mechanism rather than real cross-country reachability — all verification so far was done from within Vietnam. Confirming `192.168.1.1` loads from Europe is still outstanding.
+
 ## Runbook
 
 ```bash

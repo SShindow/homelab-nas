@@ -154,7 +154,12 @@ The spare GTX 650 was evaluated for hardware transcoding and **rejected on four 
 3. **It wouldn't help Frigate either.** Frigate's detectors need compute capability 5.0+; Kepler is 3.0.
 4. **The problem quadrant disappears for free.** Using the native client instead of a browser eliminates the only transcoding case that exists.
 
-Intel Quick Sync was also left disabled — same reasoning, no transcoding load to accelerate.
+**Intel Quick Sync is the chosen path instead of a discrete card.** The G3240's Haswell iGPU covers the same H.264 encode ground the GTX 650 would have, with no PCIe card, no extra idle draw, and no NVIDIA-driver-on-SCALE problem. Two caveats are recorded rather than assumed away:
+
+- **The measured transcode above used `-codec:v:0 libx264` — a software encoder.** Hardware encoding appears as `h264_qsv`. So QSV was *not* in the path when that measurement was taken, and the 95.9% CPU figure is a software-encode number.
+- **Haswell sits well outside Jellyfin's supported range for QSV.** The project's hardware guidance recommends 11th-gen or newer and notes that 7th–10th gen have been deprecated by Intel; a 4th-gen Pentium-tier part is several steps further back.
+
+Verification is a single grep rather than an assumption: play the XviD file in a browser and look for `h264_qsv` in the ffmpeg command line. If it still reads `libx264`, hardware transcoding is not active regardless of what the Playback settings page claims — and the Grafana CPU panel gives the same answer from the other direction.
 
 The cheapest fix for a performance problem is often to stop creating it. Adding a GPU would have drawn constant idle power to solve a case that a client-side choice removes entirely.
 
