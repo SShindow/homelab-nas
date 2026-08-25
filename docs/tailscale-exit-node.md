@@ -151,6 +151,20 @@ dd if=/dev/zero bs=1M count=100 2>/dev/null | \
 - DNS trust is shifted, not removed: queries now terminate at VNPT's resolvers instead of the local access network's. Self-hosted DNS on the NAS would keep resolution on owned infrastructure.
 - Exit-node LAN access is deliberately left **disabled** — enabling it would expose the home LAN to exit-node clients, a wider blast radius than this feature needs.
 
+## Extension: subnet router
+
+The exit node routes *internet* traffic. A subnet router advertises a **LAN** so tailnet devices can reach machines that don't run Tailscale themselves — the router's admin page, printers, IoT devices.
+
+Both flags are set in a single command, because `tailscale set` **replaces** the advertised set rather than appending to it — issuing them separately silently drops whichever came first:
+
+```bash
+tailscale set --advertise-routes=192.168.1.0/24 --advertise-exit-node
+```
+
+Approved in the admin console the same way the exit node was, then verified from a phone on mobile data by loading the router's admin UI at `192.168.1.1` — an address that exists only inside the home LAN. It persists across a reboot.
+
+The practical result: the home router's admin interface is now reachable from another continent, without exposing it to the internet.
+
 ## Runbook
 
 ```bash

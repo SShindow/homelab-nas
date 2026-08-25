@@ -6,6 +6,19 @@ All notable changes to this project are documented here, in the order they were 
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - Jellyfin media server setup
 
+## 2026 — Jellyfin media streaming
+- Deployed Jellyfin with the library on a dedicated `tank/media` dataset, deliberately outside the snapshot scope, and config on a durable host path
+- Moved a 35 GB library out of the private dataset with `zfs rename` — a metadata-only operation — and documented its two side effects (broken Cloud Sync task, dataset leaving the SMB share)
+- Migrated 208 episodes across four video and three subtitle naming conventions using a dry-run-by-default script, with four preview passes before anything moved
+- Recovered two accidental `rm -rf` deletions from ZFS snapshots; the second required the weekly snapshot because the daily had already aged out
+- Mounted the media library read-only, choosing container isolation over NFO metadata sidecars
+- Measured transcoding: only browser + XviD transcodes; native client direct-plays everything. Grafana showed 95.9% CPU and 3.1% I/O during a transcode — purely compute-bound
+- Evaluated and rejected the spare GTX 650 on four independent grounds (Kepler driver EOL, gen-1 NVENC being H.264-only, insufficient compute capability for Frigate, and the problem case disappearing with the native client)
+
+## 2026 — Tailscale subnet router
+- Advertised the home LAN (`192.168.1.0/24`) alongside the exit node, in a single `tailscale set` call since the flag replaces rather than appends
+- Approved in the admin console and verified from mobile data by loading the router's admin UI; persists across reboot
+
 ## 2026 — Client lineup change
 - Replaced the Windows laptop with a MacBook Air M2; the Mac now mounts the SMB share over Tailscale via Finder
 - Documentation updated to reflect macOS/iOS/Android as the current client set

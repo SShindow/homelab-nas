@@ -32,6 +32,7 @@ This is a living project — new capabilities are added and documented increment
 | Personal VPN / Internet Egress | Tailscale Exit Node (NAS advertises `0.0.0.0/0` + `::/0`) |
 | Video Surveillance / NVR | Frigate (RTSP from Tapo C200, recorded to the ZFS pool) |
 | Observability | Prometheus + Grafana, with node_exporter as a host binary |
+| Media Streaming | Jellyfin (library on ZFS, read-only mount, no transcoding in normal use) |
 
 See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
@@ -74,6 +75,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | **[Tailscale Exit Node](docs/tailscale-exit-node.md)** | The NAS as a personal VPN egress. Includes an upstream Tailscale bug, its diagnosis, and an ASN-based verification method. | ✅ Verified |
 | **[Camera NVR (Frigate)](docs/camera-nvr-frigate.md)** | Tapo C200 RTSP recorded to the ZFS pool with no vendor cloud, plus end-to-end performance benchmarking. | ✅ Operational |
 | **[Observability](docs/monitoring-prometheus-grafana.md)** | Prometheus + Grafana with a host-installed node_exporter, persistent host-path config, reboot-verified. | ✅ Operational |
+| **[Media Streaming](docs/media-jellyfin.md)** | Jellyfin serving a 208-episode library from the ZFS pool, with transcoding behaviour measured and the GPU question settled. | ✅ Operational |
 
 ## Key Challenges & Fixes
 
@@ -94,6 +96,9 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | Prometheus was running and healthy but collecting nothing — "No scrape pools found" | TrueNAS ships the app with an empty scrape config and no bundled exporter | Wrote `prometheus.yml` by hand and installed node_exporter separately on the host |
 | Grafana could not reach Prometheus by service name or container IP | The two apps sit on separate Docker bridge networks, so container DNS doesn't resolve between them | Addressed the host's LAN IP (`192.168.1.4:30104`) instead of the container |
 | Prometheus config vanished after an app reinstall | Config was on ixVolume, which is not durable across reinstalls and is permission-denied from the host shell | Moved config to a dedicated dataset mounted as a **Host Path**, owned `568:568` |
+| Two accidental `rm -rf` deletions during library migration | Operator error while handling four inconsistent naming conventions at once | Both recovered from `.zfs/snapshot/`. The second needed the **weekly** snapshot — the daily had already been destroyed by retention |
+| Jellyfin logged a stream of `IOException`s | Metadata *save-to-media* was enabled against a deliberately read-only media mount | Disabled both save-to-media toggles; metadata is stored in the config dataset instead |
+| `ps aux \| grep ffmpeg` showed nothing during an active transcode | Jellyfin transcodes ahead of playback in bursts, so the ffmpeg process exits between segments | Read the container logs instead of polling the process table |
 
 ## Results
 
@@ -103,6 +108,8 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty.
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps for one stream.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
+- A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path.
+- The home LAN is reachable from abroad via a Tailscale subnet router — the router's own admin page included — without exposing anything to the internet.
 
 ## Lessons Learned
 
@@ -121,6 +128,10 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - An appliance OS quietly invalidates the standard tutorial. TrueNAS reassigned Prometheus's port, shipped it with an empty scrape config, bundled no exporter, and isolated the app networks from each other — four defaults broken at once. Reading the *running process's own arguments* rather than the upstream documentation was what actually resolved it.
 - "Persistent" storage has degrees. ixVolume survives restarts but not reinstalls — which is exactly the case where losing hand-written config hurts most. Configuration and disposable data deserve different storage decisions: config went to a host path, the time-series database stayed on ixVolume on purpose.
 - Running something outside the appliance's supported model is a legitimate choice, but it has to be written down. node_exporter as a host binary buys the ZFS collector and real `/proc` visibility, and costs supportability, manual updates, and an unauthenticated metrics endpoint. The trade is worth making — and worth stating.
+- Monitoring built for its own sake paid off somewhere else entirely. Grafana was installed to watch the NAS; two weeks later it was the instrument that turned "should I add a GPU?" into a measured answer — 95.9% CPU, 3.1% I/O, therefore compute-bound, therefore a decision rather than a preference.
+- Know which operations are metadata-only. `zfs rename` moved a 35 GB library instantly, and `mv` within a dataset does the same — but a rename also silently breaks anything referencing the old path (a Cloud Sync task and SMB share membership, in this case). Instant is not the same as free of consequences.
+- The cheapest fix for a performance problem is often to stop creating it. The only transcoding case that existed disappeared by using the native client instead of a browser — no GPU, no extra idle watts, no driver compatibility problem to maintain.
+- A destructive script should default to doing nothing. `DRYRUN=1` by default, four preview passes before the first real move — and even then, two `rm -rf` mistakes still happened. Snapshots were the reason those cost minutes instead of a re-download.
 
 ## Future Improvements
 
@@ -129,8 +140,8 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [x] ~~ZFS snapshot strategy for point-in-time recovery~~ → done via [daily/weekly snapshots](docs/zfs-snapshots.md)
 - [x] ~~Personal VPN / self-hosted internet egress~~ → done via [Tailscale exit node](docs/tailscale-exit-node.md)
 - [x] ~~Local-only camera recording, off the vendor cloud~~ → done via [Frigate NVR](docs/camera-nvr-frigate.md)
-- [ ] GTX 650 reinstallation for Jellyfin hardware transcoding — evaluating whether the transcoding benefit is worth the added power draw
-- [ ] Jellyfin media server setup
+- [x] ~~GTX 650 for hardware transcoding~~ → evaluated and **rejected** on four grounds — see [Media Streaming](docs/media-jellyfin.md)
+- [x] ~~Jellyfin media server setup~~ → done, see [Media Streaming](docs/media-jellyfin.md)
 - [ ] True live 2-way sync (`rclone bisync` + cron) — only if convenience outweighs backup-safety tradeoff
 - [x] ~~System metrics collection and dashboards~~ → done via [Prometheus + Grafana](docs/monitoring-prometheus-grafana.md)
 - [ ] Alert rules on top of Prometheus (disk >85%, sustained CPU >80%) — metrics exist, alerting doesn't yet
@@ -140,7 +151,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Nextcloud (personal cloud), Vaultwarden (password manager), Pi-hole (network-wide ad blocking)
 - [ ] PiKVM for true out-of-band hardware access (board has no IPMI)
 - [ ] Self-hosted DNS (Pi-hole / AdGuard Home) as the tailnet resolver, so exit-node queries terminate on owned infrastructure instead of the ISP's
-- [ ] Tailscale subnet router to reach home LAN devices remotely (currently out of scope)
+- [x] ~~Tailscale subnet router to reach home LAN devices remotely~~ → done, see [Tailscale Exit Node](docs/tailscale-exit-node.md)
 - [ ] Tailscale ACLs / auto-approvers so routes re-advertise without manual approval after a rebuild
 - [ ] SQM / fq_codel on the router to reduce bufferbloat under load
 - [ ] Cross-country verification of the exit node from Europe
@@ -148,9 +159,12 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Hard camera isolation — VLAN + egress block, so the camera cannot reach TP-Link at all
 - [ ] Set up the second Tapo C200 in Germany
 - [ ] Connect the Windows gaming PC to the SMB share, and add it as a Syncthing peer alongside the MacBook
+- [ ] Bazarr + OpenSubtitles to fill the remaining subtitle gaps
+- [ ] Series and season poster art in Jellyfin (episode thumbnails already fetch correctly)
+- [ ] Germany-distance playback test for Jellyfin
 - [ ] Resolve the Frigate `/dev/shm` size warning on TrueNAS SCALE 25.10
 - [ ] Cross-country verification of Frigate remote viewing from Europe
 
 ---
 
-**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter
+**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin

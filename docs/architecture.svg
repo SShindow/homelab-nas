@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 1090" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="1090" fill="#0f172a"/>
+<svg viewBox="0 0 900 1220" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="1220" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -38,7 +38,7 @@
   <ellipse cx="460" cy="230" rx="90" ry="70" fill="#164e63" stroke="#22d3ee" stroke-width="2.5"/>
   <text x="460" y="222" text-anchor="middle" fill="#f0fdfa" font-size="15" font-weight="700">Tailscale</text>
   <text x="460" y="240" text-anchor="middle" fill="#a5f3fc" font-size="11">WireGuard Mesh VPN</text>
-  <text x="460" y="256" text-anchor="middle" fill="#a5f3fc" font-size="11">No port forwarding</text>
+  <text x="460" y="256" text-anchor="middle" fill="#a5f3fc" font-size="11">Exit node + subnet router</text>
 
   <!-- Arrow to NAS -->
   <line x1="550" y1="230" x2="680" y2="230" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrow)"/>
@@ -126,6 +126,17 @@
     <text x="60" y="1016" fill="#64748b" font-size="11">Auto-started by a Post Init script · reboot-verified, both scrape targets UP unattended · alerting not yet configured</text>
   </g>
 
-  <text x="450" y="1050" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
-  <text x="450" y="1068" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
+  
+  <!-- Media streaming -->
+  <g>
+    <rect x="40" y="1038" width="820" height="118" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="60" y="1066" fill="#ddd6fe" font-size="14" font-weight="700">🎬 Media Streaming (Jellyfin)</text>
+    <text x="60" y="1090" fill="#e2e8f0" font-size="12">tank/media (35.5 GB, outside snapshot scope) mounted READ-ONLY into Jellyfin · config on a durable host path</text>
+    <text x="60" y="1110" fill="#94a3b8" font-size="11">208 episodes · native client direct-plays everything · only browser + XviD transcodes (576x432 via libx264)</text>
+    <text x="60" y="1128" fill="#94a3b8" font-size="11">Transcode measured in Grafana: 95.9% CPU, 3.1% I/O = compute-bound. GTX 650 evaluated and rejected.</text>
+    <text x="60" y="1146" fill="#64748b" font-size="11">Library migration: 35 GB moved by zfs rename (metadata-only) · two rm -rf mistakes recovered from .zfs/snapshot/</text>
+  </g>
+
+  <text x="450" y="1180" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="1198" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>
