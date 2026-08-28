@@ -109,7 +109,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps from within Vietnam and ~0.74 Mbps confirmed at real Germany↔Vietnam distance — both trivial next to the >90 Mbps home connection.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
 - A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path.
-- The home LAN is reachable from abroad via a Tailscale subnet router — the router's own admin page included — without exposing anything to the internet.
+- The home LAN is reachable from abroad via a Tailscale subnet router — the router's own admin page included — without exposing anything to the internet, confirmed from a real Germany connection (not just a same-country stand-in).
 
 ## Lessons Learned
 

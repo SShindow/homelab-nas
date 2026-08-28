@@ -18,6 +18,7 @@ All notable changes to this project are documented here, in the order they were 
 ## 2026 — Tailscale subnet router
 - Advertised the home LAN (`192.168.1.0/24`) alongside the exit node, in a single `tailscale set` call since the flag replaces rather than appends
 - Approved in the admin console and verified from mobile data by loading the router's admin UI; persists across reboot
+- **2026-08-28 — Cross-country verification from Germany, completed.** `https://192.168.1.1` loaded cleanly over Tailscale from a real Germany connection with no manual route selection needed
 
 ## 2026 — Client lineup change
 - Replaced the Windows laptop with a MacBook Air M2; the Mac now mounts the SMB share over Tailscale via Finder
