@@ -56,6 +56,8 @@ All notable changes to this project are documented here, in the order they were 
 - Designed an ASN-based verification method after recognising that the obvious public-IP test would have produced a false positive when run from the same network as the NAS
 - Confirmed no DNS leak, a direct (non-relayed) IPv6 peer-to-peer path, and no measurable throughput penalty from the tunnel
 - Benchmarked the line: ~155–170 Mbps upstream international, ~439 Mbps domestic — the ~2.5x gap matters for predicting cross-country performance
+- **2026-08-28 — Cross-country verification from Germany, completed.** Confirmed the exit node with a direct public-IP/ASN comparison (finally meaningful once the two endpoints are genuinely in different countries): Deutsche Telekom/Darmstadt with the exit node off, VNPT/Ho Chi Minh City with it on
+- Measured the real cost across that distance: 91.09→65.86 Mbps down (≈28%) and 10ms→243ms idle latency (+230ms) — consistent with actual Frankfurt↔Ho Chi Minh City geography, and a far larger penalty than the same-country mobile-vs-exit-node comparison ever showed
 
 ## 2026 — ZFS Snapshot Strategy
 - Added daily (7-day retention) and weekly (4-week retention) periodic ZFS snapshots on the primary dataset

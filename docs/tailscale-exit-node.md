@@ -118,6 +118,22 @@ iphone-13-pro   active; direct [2401:d800:…]:41641, tx 78447936 rx 5026320
 
 **Connection path:** `direct`, not `relay` — peer-to-peer, with no DERP relay in the path. The mobile client connected over **IPv6**: VNPT provides public IPv6, so NAT traversal succeeded without any port forwarding on the router.
 
+## Cross-country verification (Germany)
+
+Everything above proves the exit node *works* — it does not prove it is useful from where the traffic will actually originate. Every test so far was run from inside Vietnam, where the "obvious" public-IP check is meaningless (see above): mobile and home broadband are both Vietnamese, so the address barely moves. Once back in Germany, on a real foreign connection, that same obvious test becomes the *right* one — two different countries either side of the tunnel, so a direct IP/ASN comparison is now meaningful rather than a false positive.
+
+| Exit node | Public IP | ASN | Location |
+|---|---|---|---|
+| **off** | German address | **AS3320 Deutsche Telekom AG** | Darmstadt, Hesse, DE |
+| **on** | Vietnamese address | **AS45899 VNPT Corp** | Ho Chi Minh City, VN |
+
+*(IP, hostname, precise coordinates, and postal code redacted — ASN and city are the evidence, same convention as the table above.)*
+
+![IP/ASN comparison from Germany, exit node off vs on](img/exit-node-germany-comparison.png)
+*Same MacBook, same ipinfo.io lookup, exit node toggled: the originating network flips from Deutsche Telekom in Darmstadt to VNPT in Ho Chi Minh City.*
+
+Unlike the in-Vietnam test, this doesn't need the ASN-change workaround — with genuine distance between the two networks, a plain public-IP lookup is sufficient evidence on its own.
+
 ## Performance
 
 | Scenario | Down | Up | Idle RTT | Loaded RTT |
@@ -127,6 +143,10 @@ iphone-13-pro   active; direct [2401:d800:…]:41641, tx 78447936 rx 5026320
 | Home LAN → domestic server | 439.56 Mbps | — | 6 ms | 17 ms |
 | Home LAN → international (HK/SG) | 170 Mbps | 170 Mbps | 30 ms | 39 ms |
 | **NAS → Cloudflare (upload)** | — | **155.5 Mbps** | — | — |
+| **Germany home, no tunnel** | **91.09 Mbps** | **33.19 Mbps** | **10 ms** | **47 / 89 ms** ↓/↑ |
+| **Germany home, via exit node** | **65.86 Mbps** | **31.00 Mbps** | **243 ms** | **266 / 277 ms** ↓/↑ |
+
+*(The two Germany rows use speedtest.net's Ookla client, which reports idle ping plus separate download- and upload-loaded latency rather than one combined "Loaded RTT" — shown as `download/upload`. Test server also differs by design: nearest-server auto-selection puts the "off" row on a Frankfurt server and the "on" row on a Ho Chi Minh City server, since that's where each connection actually egresses.)*
 
 Measured from the NAS itself, independent of any client or browser:
 
@@ -141,6 +161,7 @@ dd if=/dev/zero bs=1M count=100 2>/dev/null | \
 - **The bottleneck was the mobile access link**, not the NAS. The home line sustains ~155–170 Mbps upstream, roughly six times what was observed through the tunnel.
 - **Domestic and international throughput differ by ~2.5×** on the same line (439 Mbps to a Vietnamese server vs 170 Mbps to Hong Kong / Singapore). For exit-node use from Europe the *international* figure is the relevant one; quoting the domestic number would materially overstate expected performance.
 - **Bufferbloat is the carrier's, not the NAS's.** The mobile link degraded 34 ms → 174 ms under load with no tunnel involved at all; through the exit node it reached 229 ms. So ~140 ms of queueing is inherent to the mobile network and ~55 ms is attributable to the extra hop. The home line stays clean by comparison (30 → 39 ms international).
+- **The real cross-country cost, measured from Germany:** download dropped from 91.09 Mbps direct to 65.86 Mbps through the exit node (≈28% down), while idle latency rose from 10 ms to 243 ms — an increase of roughly 230 ms. That's consistent with genuine geographic distance (Frankfurt ↔ Ho Chi Minh City is ~9,300 km) rather than any inefficiency in the tunnel itself, and it's the number that actually matters for the stated use case — a Vietnamese egress point reached from Europe. The in-Vietnam mobile-vs-exit-node comparison above only ever measured a same-country hop and could not have surfaced this; the two picture very different things (extra-hop overhead vs. real transcontinental RTT).
 
 ## Known limitations
 
@@ -183,4 +204,4 @@ sudo docker exec ix-tailscale-tailscale-1 tailscale set --advertise-exit-node
 
 Expected: the node reports `offers exit node`, and `AdvertiseRoutes` contains both `0.0.0.0/0` and `::/0`.
 
-**Status:** ✅ Operational and verified — exit node advertised, approved, and confirmed carrying client traffic by ASN change, with no DNS leak and no measurable throughput penalty. Cross-country verification from Europe still pending.
+**Status:** ✅ Operational and verified — exit node advertised, approved, and confirmed carrying client traffic by ASN change, with no DNS leak and no measurable throughput penalty in-country. Cross-country verification from Europe **complete**: real IP/ASN change confirmed and a genuine ~28% download / +230 ms latency cost measured from a real Germany connection.

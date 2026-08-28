@@ -105,7 +105,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - Client devices across macOS, iOS and Android reliably connect to the NAS over Tailscale from outside the home network.
 - Storage is redundant via ZFS mirroring, protecting against single-disk failure.
 - Setup survives reboots and power interruptions without manual intervention.
-- The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty.
+- The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty in-country, and confirmed from a real Germany connection with a genuine IP/ASN flip (Deutsche Telekom → VNPT) plus a measured ~28% download / +230 ms latency cost across the real distance.
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps for one stream.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
 - A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path.
@@ -154,7 +154,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [x] ~~Tailscale subnet router to reach home LAN devices remotely~~ → done, see [Tailscale Exit Node](docs/tailscale-exit-node.md)
 - [ ] Tailscale ACLs / auto-approvers so routes re-advertise without manual approval after a rebuild
 - [ ] SQM / fq_codel on the router to reduce bufferbloat under load
-- [ ] Cross-country verification of the exit node from Europe
+- [x] ~~Cross-country verification of the exit node from Europe~~ → done, see [Tailscale Exit Node](docs/tailscale-exit-node.md)
 - [ ] Coral USB TPU for person/stranger detection and alerting (currently CPU detection only)
 - [ ] Hard camera isolation — VLAN + egress block, so the camera cannot reach TP-Link at all
 - [ ] Set up the second Tapo C200 in Germany
