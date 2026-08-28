@@ -45,6 +45,7 @@ All notable changes to this project are documented here, in the order they were 
 - Verified full reboot resilience end to end, checked from outside the LAN over Tailscale
 - Benchmarked the stack: 80.2 MB/s baseline ZFS write, 319.19 MiB/hour per camera, 13-15% CPU, ~1.42 Mbps for remote live view
 - Corrected an invalid `dd if=/dev/zero` disk benchmark that was measuring lz4 compression rather than disk throughput, and discarded a remote-bandwidth sample contaminated by a mid-test network switch
+- **2026-08-28 — Cross-country remote-view test from Germany, completed.** Real Vietnam↔Germany figure: ~0.74 Mbps (~92 KB/s down / ~4.4 KB/s up) over a ~90s sample — noticeably lower than the Vietnam-cellular baseline (~1.42 Mbps), most likely scene-dependent H.264 bitrate rather than a network effect; either way, trivial next to the home connection's throughput
 - Deferred: person/stranger detection pending a Coral USB TPU; hard VLAN isolation of the camera
 
 ## 2026 — Tailscale Exit Node (Personal VPN)

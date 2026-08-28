@@ -80,7 +80,8 @@ That single check exercises the entire chain unattended: NAS boots → Docker st
 | Frigate recording bandwidth, 1 camera | **319.19 MiB/hour** (~90.7 KB/s) |
 | Frigate CPU load, sustained recording | **13–15%** total on the Pentium G3240 |
 | Detector inference (CPU-based, no Coral) | 10 ms |
-| Remote live-view over Tailscale | ~176.9 KB/s down / ~3.1 KB/s up (**≈1.42 Mbps**) |
+| Remote live-view over Tailscale (Vietnam-cellular baseline) | ~176.9 KB/s down / ~3.1 KB/s up (**≈1.42 Mbps**) |
+| Remote live-view over Tailscale (real cross-country, from Germany) | ~92 KB/s down / ~4.4 KB/s up (**≈0.74 Mbps**) |
 
 ![Frigate System page](img/frigate-system.png)
 *Detector inference at 10 ms, total CPU 14% while recording.*
@@ -106,6 +107,8 @@ dd if=/dev/urandom of=/mnt/tank/test bs=1M count=20000 conv=fdatasync
 
 That ~1.42 Mbps is application-level data for one modest-bitrate stream — it is **not** comparable to the exit node's link-saturation speedtest figures (18–27 Mbps). Different question, different measurement.
 
+**Real cross-country figure, from Germany.** Once back in Germany, the same test was redone on a real Vietnam↔Germany connection (exit node off — this test only needs the base Tailscale mesh, not the exit-node feature) — Rcvd Bytes 11.1 MB → 19.4 MB over an approximately 90-second sample (timed against the camera's on-screen overlay for the end point; the start point was timed by wall clock, so call it 90s ± 15s), giving **~92 KB/s down / ~4.4 KB/s up ≈ 0.74 Mbps**. That's noticeably *lower* than the Vietnam-cellular baseline above, not higher — worth stating honestly rather than reading into it: H.264 bitrate is scene-dependent (a mostly-static room compresses far more than one with motion), so part of the gap could be less motion in this particular sample rather than the network path itself. What the number does confirm cleanly is that real cross-country distance doesn't blow the bandwidth budget — even the higher of the two readings is trivial next to the 91 Mbps+ home connection measured for the exit node.
+
 **Open watch item:** Frigate flags `/dev/shm` (64 MB) as below its recommended 126 MB minimum. Actual usage sits at a few MiB of the 64 MB allocated, so there's no practical pressure, and the TrueNAS SCALE 25.10-specific fix could not be confirmed — a community thread on the same version was redirected to a separate unresolved support thread. Parked deliberately rather than chased.
 
 ## Known limitations
@@ -114,6 +117,6 @@ That ~1.42 Mbps is application-level data for one modest-bitrate stream — it i
 - **No person/object detection yet.** Detection runs on CPU; reliable person/stranger alerting needs a Coral USB TPU (~$60–70), not yet purchased. The Frigate choice means adding it is a config change.
 - **Recording depends on the camera's Wi-Fi.** A wired camera would remove a failure mode, but placement won.
 - **Single copy.** Footage lives on the ZFS mirror — redundant against a disk failure, but it is not backed up off-site the way the Google Drive dataset is.
-- **Cross-country access is unverified.** Remote viewing was tested from cellular *within Vietnam*; a real Germany↔Vietnam figure is still pending.
+- **Cross-country access is now verified.** ~~Remote viewing was tested from cellular *within Vietnam*; a real Germany↔Vietnam figure is still pending.~~ Confirmed 2026-08-28 from a real Germany connection: ~0.74 Mbps for the live view, reachable and usable at real distance.
 
-**Status:** ✅ Operational — recording continuously to the ZFS pool, surviving full reboots unattended, benchmarked end to end, and reachable remotely over Tailscale. Vendor cloud carries none of the footage.
+**Status:** ✅ Operational — recording continuously to the ZFS pool, surviving full reboots unattended, benchmarked end to end (including a real Germany↔Vietnam cross-country figure), and reachable remotely over Tailscale. Vendor cloud carries none of the footage.
