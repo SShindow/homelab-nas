@@ -14,6 +14,7 @@ All notable changes to this project are documented here, in the order they were 
 - Mounted the media library read-only, choosing container isolation over NFO metadata sidecars
 - Measured transcoding: only browser + XviD transcodes; native client direct-plays everything. Grafana showed 95.9% CPU and 3.1% I/O during a transcode — purely compute-bound
 - Evaluated and rejected the spare GTX 650 on four independent grounds (Kepler driver EOL, gen-1 NVENC being H.264-only, insufficient compute capability for Frigate, and the problem case disappearing with the native client)
+- **2026-08-28 — Germany-distance playback test, completed.** Direct play confirmed bitrate-bound as predicted: ~1.98 Mbps for an H.264 episode over Tailscale from Germany, Jellyfin container at 1.73% CPU. The one browser-transcode case failed to start over the same distance — ffmpeg launched but the browser gave up after ~50s each time, with the container at 158.36% CPU; inconclusive whether that's a distance effect or the NAS simply carrying more background load (Frigate, arr-stack) than when the original transcode benchmark was taken
 
 ## 2026 — Tailscale subnet router
 - Advertised the home LAN (`192.168.1.0/24`) alongside the exit node, in a single `tailscale set` call since the flag replaces rather than appends

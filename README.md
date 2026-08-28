@@ -108,7 +108,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty in-country, and confirmed from a real Germany connection with a genuine IP/ASN flip (Deutsche Telekom → VNPT) plus a measured ~28% download / +230 ms latency cost across the real distance.
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps from within Vietnam and ~0.74 Mbps confirmed at real Germany↔Vietnam distance — both trivial next to the >90 Mbps home connection.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
-- A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path.
+- A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path — confirmed bitrate-bound (~1.98 Mbps for one episode) at real Germany↔Vietnam distance, with almost no CPU used; the one browser-transcode case, by contrast, failed to start over that same distance under the NAS's current CPU load.
 - The home LAN is reachable from abroad via a Tailscale subnet router — the router's own admin page included — without exposing anything to the internet, confirmed from a real Germany connection (not just a same-country stand-in).
 
 ## Lessons Learned
@@ -161,7 +161,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Connect the Windows gaming PC to the SMB share, and add it as a Syncthing peer alongside the MacBook
 - [ ] Bazarr + OpenSubtitles to fill the remaining subtitle gaps
 - [ ] Series and season poster art in Jellyfin (episode thumbnails already fetch correctly)
-- [ ] Germany-distance playback test for Jellyfin
+- [x] ~~Germany-distance playback test for Jellyfin~~ → done, Direct Play confirmed bitrate-bound at real distance; the browser-transcode case did not — see [Media Streaming](docs/media-jellyfin.md)
 - [ ] Resolve the Frigate `/dev/shm` size warning on TrueNAS SCALE 25.10
 - [x] ~~Cross-country verification of Frigate remote viewing from Europe~~ → done, see [Camera NVR (Frigate)](docs/camera-nvr-frigate.md)
 

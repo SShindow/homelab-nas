@@ -165,6 +165,16 @@ Verification is a single grep rather than an assumption: play the XviD file in a
 
 The cheapest fix for a performance problem is often to stop creating it. Adding a GPU would have drawn constant idle power to solve a case that a client-side choice removes entirely.
 
+### Germany-distance verification (2026-08-28)
+
+Back in Germany, the prediction in "Still open" below was tested for real: does Direct Play scale with distance the way the theory predicts, and does the one transcoding case (browser + old codec) still behave the same way at real Vietnam↔Germany distance instead of on the LAN?
+
+**Direct play — confirmed, bitrate-bound as predicted.** An H.264 episode played over Tailscale from a genuine German connection (exit node off — this only needs the base tailnet mesh, same reasoning as the other cross-country tests) with `docker stats` showing the Jellyfin container at **1.73% CPU** — effectively idle, no transcode running. Activity Monitor Rcvd Bytes measured **244.9 MB → 267.2 MB (+22.3 MB) over ~90s (±15s)**, giving **≈248 KB/s ≈ 1.98 Mbps down**. Trivial next to the >90 Mbps home connection measured for the exit node, and consistent with the prediction: distance doesn't matter once no transcode is needed.
+
+**The transcode case — same codec path, new failure mode.** Playing an old `.avi` episode in the browser (the one case from the table above that transcodes) triggered the same `libx264` software encode documented above, but this time **playback never started**. Two separate attempts both ended the same way: ffmpeg launched, ran for ~50 seconds, then exited normally (`code 0`) once the browser gave up waiting and closed the connection. `docker stats` during the attempt showed the container at **158.36% CPU** — most of both cores, on top of whatever else the box is running now (Frigate, the arr-stack containers, etc. — all added to this NAS after the original in-Vietnam 95.9%-CPU measurement above). The `-analyzeduration 200M -probesize 1G` deep probe this codec requires stacks on top of that CPU pressure, likely pushing time-to-first-segment past the browser's buffering patience.
+
+Worth stating honestly rather than overclaiming: this can't be cleanly attributed to distance alone. The box carries more background load today than when the original transcode measurement was taken, so the same stall might already reproduce on the LAN. What's confirmed is that this specific transcode path is not currently reliable from Germany; what's unconfirmed is how much of that is distance versus a now-busier NAS.
+
 ## Gotchas
 
 - **zsh expands `~208` in inline comments** → `no such user`. Bit twice while annotating episode counts in scripts.
@@ -176,6 +186,6 @@ The cheapest fix for a performance problem is often to stop creating it. Adding 
 
 - **Missing subtitles** — S06E21–24 English, ~20 episodes of S09 Vietnamese. Bazarr + OpenSubtitles is the intended fix.
 - **Series and season poster art.** Episode thumbnails fetched correctly; the higher-level artwork did not.
-- **Germany-distance playback test.** Direct play over the tunnel should be bounded by the library's own bitrate rather than by transcoding, but that's a prediction until measured.
+- ~~**Germany-distance playback test.**~~ Confirmed 2026-08-28 — see "Germany-distance verification" above. Direct play is bitrate-bound as predicted (~1.98 Mbps for one H.264 episode); the browser-transcode case, however, failed to start over real distance and needs revisiting once the arr-stack's added CPU load is accounted for.
 
-**Status:** ✅ Operational — 208 episodes catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, and the hardware-acceleration question closed with evidence.
+**Status:** ✅ Operational — 208 episodes catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, the hardware-acceleration question closed with evidence, and Direct Play confirmed working at real Germany↔Vietnam distance (the one browser-transcode case remains unreliable from Germany — see above).
