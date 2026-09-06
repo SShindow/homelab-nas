@@ -86,6 +86,8 @@ The catch is that this safety net is decaying. No periodic task creates new snap
 
 Isolation won. Metadata lives in `tank/jellyfin-config` instead, which is itself on a durable host path. Both *save-to-media* toggles were switched off after they produced a stream of `IOException` noise in the logs — the container correctly failing to write to a read-only mount.
 
+A **Movies** library was added later, once the [arr-stack](arr-stack.md) started delivering films — the container already had the whole media dataset mounted, so this was a simple in-UI add (`/media/movies`) rather than a compose/volume change. Settings deliberately match the existing read-only-aware setup: NFO/artwork save-to-media both off, Trickplay/chapter extraction off, and **real-time monitoring on** so new Radarr downloads appear without waiting for a scheduled scan.
+
 ## Transcoding — the headline finding
 
 | Client | Codec | Result |
@@ -175,6 +177,20 @@ Back in Germany, the prediction in "Still open" below was tested for real: does 
 
 Worth stating honestly rather than overclaiming: this can't be cleanly attributed to distance alone. The box carries more background load today than when the original transcode measurement was taken, so the same stall might already reproduce on the LAN. What's confirmed is that this specific transcode path is not currently reliable from Germany; what's unconfirmed is how much of that is distance versus a now-busier NAS.
 
+### Real-world remote playback throughput (2026-08-28)
+
+The Direct Play result above (1.98 Mbps, trivial) turned out **not to generalize** to higher-bitrate content — found via the [arr-stack](arr-stack.md)'s first real downloaded movie, not during planned testing. A newly-downloaded film (Blu-ray-tier 1080p x264 + EAC3 Atmos, 6.2 GiB) stuttered constantly when streamed live from Germany — freeze, catch up, repeat.
+
+**Ruled out in order:** NAS CPU (`top` showed 74.7% idle — the Atmos audio only needs a lightweight remux/"Direct Streaming," not a real transcode); a DERP-relayed Tailscale connection (`tailscale status` confirmed `direct <IP>:41641` — genuinely peer-to-peer); raw bandwidth (a generic speedtest from the NAS showed a healthy 161.83 Mbps upload).
+
+**Real cause, found with `iperf3` run directly over the Tailscale link** (NAS↔MacBook, reverse mode to match the actual streaming direction): sustained throughput was only **~3.78 Mbps**, with heavy retransmissions (128 retries in ~10s) and multiple full one-second windows of literal zero bytes transferred — a TCP congestion window collapsing from 180 KB to 8 KB, the signature of real packet loss on the international route rather than a bandwidth ceiling. The generic speedtest's 161 Mbps was measuring a nearby regional server, not the actual Vietnam→Germany hop — consistent with Vietnam's known international submarine-cable congestion, a structural ISP-level issue with no NAS-side or Jellyfin-side fix.
+
+**Practical workaround adopted:** manually cap Jellyfin's player Quality/bitrate setting for remote playback instead of Auto/Direct Play. ~1.5 Mbps still had occasional 1–2s freezes; the lowest available tier (~420 Kbps) eliminated freezing entirely but looked noticeably degraded. No bitrate gives both smooth playback and good quality simultaneously on this path — an honest structural limitation, not a config bug.
+
+**Alternative researched and explicitly declined:** relocating the arr-stack + Jellyfin to a European-hosted seedbox/VPS would fix this at the root (a short Netherlands↔Germany hop instead of an intercontinental one). Bundled seedbox providers with one-click Radarr/Sonarr/Jellyfin run roughly €5–14/month; a DIY cheap-VPS-plus-storage route can run cheaper (~€3–10/month) but means rebuilding the whole stack. **Not pursued** — the actual use case for this stack is occasional downloads of rare films not on existing streaming subscriptions, not primary daily viewing, so the added recurring cost/complexity isn't justified. Revisit only if remote movie-watching becomes frequent enough to justify it.
+
+**Net takeaway:** Direct Play of already-low-bitrate content (TV episodes, ~2 Mbps) works fine live from Germany. Anything at a film's native Blu-ray-tier bitrate (typically 8–15+ Mbps) will not stream smoothly live — plan on either a heavily quality-capped live stream, or downloading the file first and playing it locally.
+
 ## Gotchas
 
 - **zsh expands `~208` in inline comments** → `no such user`. Bit twice while annotating episode counts in scripts.
@@ -184,8 +200,9 @@ Worth stating honestly rather than overclaiming: this can't be cleanly attribute
 
 ## Still open
 
-- **Missing subtitles** — S06E21–24 English, ~20 episodes of S09 Vietnamese. Bazarr + OpenSubtitles is the intended fix.
+- **Missing subtitles** — S06E21–24 English, ~20 episodes of S09 Vietnamese. [Bazarr](arr-stack.md) was connected and a search triggered, but the count never moved past 182/208 — accepted as-is rather than pursued further.
 - **Series and season poster art.** Episode thumbnails fetched correctly; the higher-level artwork did not.
 - ~~**Germany-distance playback test.**~~ Confirmed 2026-08-28 — see "Germany-distance verification" above. Direct play is bitrate-bound as predicted (~1.98 Mbps for one H.264 episode); the browser-transcode case, however, failed to start over real distance and needs revisiting once the arr-stack's added CPU load is accounted for.
+- **Real remote-playback throughput ceiling** (~3.78 Mbps sustained Vietnam↔Germany, see above) means Blu-ray-tier content needs a manual bitrate cap or a local download — accepted as a structural limitation for now given the stack's actual (occasional-download) usage pattern.
 
-**Status:** ✅ Operational — 208 episodes catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, the hardware-acceleration question closed with evidence, and Direct Play confirmed working at real Germany↔Vietnam distance (the one browser-transcode case remains unreliable from Germany — see above).
+**Status:** ✅ Operational — 208 episodes plus a growing Movies library (via the [arr-stack](arr-stack.md)) catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, the hardware-acceleration question closed with evidence, Direct Play confirmed working at real Germany↔Vietnam distance, and the real-world remote-throughput ceiling measured and worked around.

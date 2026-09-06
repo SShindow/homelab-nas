@@ -33,15 +33,17 @@ This is a living project — new capabilities are added and documented increment
 | Video Surveillance / NVR | Frigate (RTSP from Tapo C200, recorded to the ZFS pool) |
 | Observability | Prometheus + Grafana, with node_exporter as a host binary |
 | Media Streaming | Jellyfin (library on ZFS, read-only mount, no transcoding in normal use) |
+| Media Automation | Prowlarr → Sonarr/Radarr/Lidarr → qBittorrent → Bazarr → Seerr, request-to-playback pipeline for TV/movies/music |
+| Friend Access | Wizarr (self-service Jellyfin invites) + Cleanuparr (stalled-download cleanup) |
 
 See [`docs/architecture.svg`](docs/architecture.svg) for the full diagram.
 
 ## Hardware
 
-- CPU: Intel Pentium G3240
+- CPU: Intel Pentium G3240 (2 cores/2 threads) — **upgrade to an Intel Core i7-4790 (non-K) planned** for the next on-site visit: same LGA1150 socket, drop-in on the existing board, no BIOS update needed (see [Key Challenges & Fixes](#key-challenges--fixes)); not yet installed
 - RAM: 16GB DDR3
 - Motherboard: ASUS H81M-D (BIOS v2106)
-- Storage: 2x 2TB Seagate HDD (mirrored ZFS pool), 128GB Kingston SSD (boot/OS)
+- Storage: 2x 2TB HDD (mirrored ZFS pool — at least one confirmed a WD Green WD20EZRX, not Seagate as originally recorded here; see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)), 128GB Kingston SSD (boot/OS)
 - GPU: GTX 650 (available but **not installed** — evaluated for hardware transcoding and rejected on four grounds; see [Media Streaming](docs/media-jellyfin.md))
 - Router: ISP-issued GPON ONT (no WAN-side Wake-on-LAN support)
 - Camera: TP-Link Tapo C200 (1080p, RTSP), Wi-Fi, recording to the NAS rather than its 32GB SD card
@@ -72,10 +74,13 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | **[Google Drive → NAS Backup](docs/google-drive-backup.md)** | One-way (Pull + Copy) Cloud Sync so cloud-side deletions can't propagate to the local copy. | ✅ Operational |
 | **[Power-Loss Resilience](docs/power-loss-resilience.md)** | Root-caused a failing CMOS battery that silently reset the BIOS auto-power-on setting; verified with a real fuse cut. | ✅ Verified |
 | **[ZFS Snapshot Strategy](docs/zfs-snapshots.md)** | Daily and weekly periodic snapshots for instant local point-in-time recovery, layered with the off-site cloud copy. | ✅ Operational |
-| **[Tailscale Exit Node](docs/tailscale-exit-node.md)** | The NAS as a personal VPN egress. Includes an upstream Tailscale bug, its diagnosis, and an ASN-based verification method. | ✅ Verified |
+| **[Tailscale Exit Node](docs/tailscale-exit-node.md)** | The NAS as a personal VPN egress, plus a subnet router extension reaching the whole home LAN remotely. | ✅ Verified |
 | **[Camera NVR (Frigate)](docs/camera-nvr-frigate.md)** | Tapo C200 RTSP recorded to the ZFS pool with no vendor cloud, plus end-to-end performance benchmarking. | ✅ Operational |
 | **[Observability](docs/monitoring-prometheus-grafana.md)** | Prometheus + Grafana with a host-installed node_exporter, persistent host-path config, reboot-verified. | ✅ Operational |
-| **[Media Streaming](docs/media-jellyfin.md)** | Jellyfin serving a 208-episode library from the ZFS pool, with transcoding behaviour measured and the GPU question settled. | ✅ Operational |
+| **[Media Streaming](docs/media-jellyfin.md)** | Jellyfin serving a growing library from the ZFS pool, with transcoding behaviour and real remote-throughput limits measured. | ✅ Operational |
+| **[Media Automation (arr-stack)](docs/arr-stack.md)** | Seerr → Prowlarr → Sonarr/Radarr/Lidarr → qBittorrent → Bazarr request-to-playback pipeline, plus Wizarr/Cleanuparr for friend access. | ✅ Operational (Lidarr paused) |
+
+**[Troubleshooting Playbook](docs/troubleshooting.md)** — recurring problem patterns collected across every module above (container networking, ISP DNS interference, storage diagnostics, and more), grouped by root cause rather than by which module happened to surface each one first.
 
 ## Key Challenges & Fixes
 
@@ -99,16 +104,26 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | Two accidental `rm -rf` deletions during library migration | Operator error while handling four inconsistent naming conventions at once | Both recovered from `.zfs/snapshot/`. The second needed the **weekly** snapshot — the daily had already been destroyed by retention |
 | Jellyfin logged a stream of `IOException`s | Metadata *save-to-media* was enabled against a deliberately read-only media mount | Disabled both save-to-media toggles; metadata is stored in the config dataset instead |
 | `ps aux \| grep ffmpeg` showed nothing during an active transcode | Jellyfin transcodes ahead of playback in bursts, so the ffmpeg process exits between segments | Read the container logs instead of polling the process table |
+| Every new arr-stack app-to-app connection (Prowlarr↔Sonarr/Radarr/Lidarr, Sonarr/Radarr↔qBittorrent) failed on first setup | Each app's "Server" field defaulted to `localhost`, which resolves to the container itself, not its intended target | Container-name DNS on the shared bridge (`http://prowlarr:9696`, etc.) — see [Troubleshooting](docs/troubleshooting.md#1-container-to-container-networking) |
+| Prowlarr's Nyaa.si indexer and, separately, Seerr's entire discover/search UI both failed with vague network-level errors | VNPT (the ISP)'s DNS resolvers intermittently interfering with specific external domains — confirmed by `curl` succeeding from inside the same container | Per-container `dns: [1.1.1.1, 1.0.0.1]` override in the Custom App YAML — see [Troubleshooting](docs/troubleshooting.md#2-dns--isp-interference-vnpt) |
+| qBittorrent's WebUI returned a bare `Unauthorized`, not a login page | Host Header Validation rejects any request not arriving via `localhost` or a whitelisted domain — this NAS is reached via its Tailscale IP | Edited `qBittorrent.conf` directly: `WebUI\HostHeaderValidation=false` (no env var exposes this) |
+| qBittorrent categories had correct save paths configured but torrents still landed in the default path | `Use Category paths in Manual Mode` was unchecked — Manual torrent-management mode ignores per-category paths without it | Enabled the setting; kept `Manual` (not `Automatic`) mode overall to protect Sonarr/Radarr's hardlinks |
+| The arr-stack Custom App got stuck showing "Deploying" after adding two new services | A port collision with an unrelated pre-existing container — not the suspected registry/network issue | `docker ps -a` + `docker logs` found the real error (`port already allocated`); reassigned the colliding port |
+| Wizarr's Jellyfin library scan found nothing at the same LAN IP that works for Seerr's identical integration | Wizarr's container apparently resolves cross-network reachability differently than Seerr's | Used the NAS's own Tailscale IP instead — confirmed empirically, root cause not fully pinned down |
+| Wizarr's "Test & Add" step 404'd even though the library scan against the same URL had just succeeded | A trailing slash in the URL field, likely producing a double-slash request path on a different internal endpoint | Removed the trailing slash |
+| A CRITICAL ZFS pool alert (`sda` FAULTED) sat unnoticed for 4 days; `smartctl` then failed outright with `INQUIRY failed` | `dmesg` showed `hostbyte=DID_BAD_TARGET` — the SATA controller couldn't address the drive at all, a bus/connection-level fault rather than confirmed media failure | A full reboot re-initialized the controller; the disk rejoined and resilvered clean. A later scrub found new checksum errors on the same disk, escalating it from "probably a cable" to "plan a replacement" — see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware) |
 
 ## Results
 
 - Client devices across macOS, iOS and Android reliably connect to the NAS over Tailscale from outside the home network.
-- Storage is redundant via ZFS mirroring, protecting against single-disk failure.
+- Storage is redundant via ZFS mirroring, protecting against single-disk failure — including surviving a real disk-fault incident, diagnosed and worked through entirely remotely with zero data loss (see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)).
 - Setup survives reboots and power interruptions without manual intervention.
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty in-country, and confirmed from a real Germany connection with a genuine IP/ASN flip (Deutsche Telekom → VNPT) plus a measured ~28% download / +230 ms latency cost across the real distance.
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps from within Vietnam and ~0.74 Mbps confirmed at real Germany↔Vietnam distance — both trivial next to the >90 Mbps home connection.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
-- A 208-episode media library streams from the NAS with direct play on the native client, no transcoding, and no third-party service in the path — confirmed bitrate-bound (~1.98 Mbps for one episode) at real Germany↔Vietnam distance, with almost no CPU used; the one browser-transcode case, by contrast, failed to start over that same distance under the NAS's current CPU load.
+- A growing media library streams from the NAS with direct play on the native client for most content, no transcoding, and no third-party service in the path — confirmed bitrate-bound (~1.98 Mbps for one TV episode) at real Germany↔Vietnam distance, with almost no CPU used; a real end-to-end request (Seerr → Radarr → qBittorrent → Jellyfin) for a full Blu-ray-tier movie was also confirmed working, with the actual Vietnam↔Germany throughput ceiling (~3.78 Mbps sustained, not the ~161 Mbps a generic speedtest suggests) measured and worked around with a manual quality cap.
+- A full request-to-playback automation pipeline (Seerr → Prowlarr → Sonarr/Radarr → qBittorrent → Bazarr) is deployed and confirmed working end to end with a real movie request, with 8 redundant indexers spread across movie/TV/anime categories so no single site's downtime blocks the pipeline.
+- Jellyfin access for friends is now a self-service invite link (Wizarr) rather than a manually-created account and a password relayed over chat, confirmed end to end with a real invite → account creation → playback test — set up ahead of a planned expansion to ~10 friends across three countries.
 - The home LAN is reachable from abroad via a Tailscale subnet router — the router's own admin page included — without exposing anything to the internet, confirmed from a real Germany connection (not just a same-country stand-in).
 
 ## Lessons Learned
@@ -132,6 +147,10 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - Know which operations are metadata-only. `zfs rename` moved a 35 GB library instantly, and `mv` within a dataset does the same — but a rename also silently breaks anything referencing the old path (a Cloud Sync task and SMB share membership, in this case). Instant is not the same as free of consequences.
 - The cheapest fix for a performance problem is often to stop creating it. The only transcoding case that existed disappeared by using the native client instead of a browser — no GPU, no extra idle watts, no driver compatibility problem to maintain.
 - A destructive script should default to doing nothing. `DRYRUN=1` by default, four preview passes before the first real move — and even then, two `rm -rf` mistakes still happened. Snapshots were the reason those cost minutes instead of a re-download.
+- The same category of bug recurs across every new integration in a stack, not just once. `localhost`-vs-container-name was hit on at least five separate app pairings; recognizing the pattern turns a 20-minute debug into a 20-second fix on the sixth occurrence. See the [Troubleshooting Playbook](docs/troubleshooting.md) for the full set of recurring patterns collected across this project.
+- A working fix from one integration doesn't automatically generalize to the next one solving the same-shaped problem — Wizarr needing the Tailscale IP where Seerr needed the LAN IP for the identical "reach Jellyfin from another Docker network" problem is the clearest example. Verify empirically rather than assuming a prior fix transfers.
+- A UI's status badge is not ground truth. A Custom App stuck "Deploying" with no further detail was resolved in minutes once the investigation moved to `docker ps -a` / `docker logs` / `docker top` instead of waiting on the dashboard.
+- A process completing "with 0 errors" answers a narrower question than it sounds like. A ZFS resilver reporting zero errors only proves the blocks it touched were fine; a full scrub afterward found new checksum errors on the same disk that the resilver's clean result had nothing to say about.
 
 ## Future Improvements
 
@@ -159,12 +178,19 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Hard camera isolation — VLAN + egress block, so the camera cannot reach TP-Link at all
 - [ ] Set up the second Tapo C200 in Germany
 - [ ] Connect the Windows gaming PC to the SMB share, and add it as a Syncthing peer alongside the MacBook
-- [ ] Bazarr + OpenSubtitles to fill the remaining subtitle gaps
+- [x] ~~Bazarr + OpenSubtitles to fill the remaining subtitle gaps~~ → deployed and connected; search triggered for the existing library but a handful of gaps remain (see [Media Automation](docs/arr-stack.md)) — accepted as-is for now
 - [ ] Series and season poster art in Jellyfin (episode thumbnails already fetch correctly)
 - [x] ~~Germany-distance playback test for Jellyfin~~ → done, Direct Play confirmed bitrate-bound at real distance; the browser-transcode case did not — see [Media Streaming](docs/media-jellyfin.md)
 - [ ] Resolve the Frigate `/dev/shm` size warning on TrueNAS SCALE 25.10
 - [x] ~~Cross-country verification of Frigate remote viewing from Europe~~ → done, see [Camera NVR (Frigate)](docs/camera-nvr-frigate.md)
+- [x] ~~Full request-to-playback automation pipeline (arr-stack)~~ → done, see [Media Automation](docs/arr-stack.md)
+- [x] ~~Self-service friend access to Jellyfin~~ → done via Wizarr, see [Media Automation](docs/arr-stack.md)
+- [x] ~~Stalled/failed download cleanup~~ → done via Cleanuparr, see [Media Automation](docs/arr-stack.md)
+- [ ] Lidarr (music automation) — deployed and configured, paused before its end-to-end test; see [Media Automation](docs/arr-stack.md)
+- [ ] Tdarr (unified transcode format) — evaluated and declined for now, no HEVC-capable hardware in this NAS
+- [ ] CPU upgrade (Intel Core i7-4790, non-K) — planned for the next on-site visit, drop-in on the existing board
+- [ ] Replace the ZFS mirror disk that showed a real fault pattern this session — see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)
 
 ---
 
-**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin
+**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin · Prowlarr · Sonarr · Radarr · Lidarr · Bazarr · qBittorrent · Seerr (Jellyseerr) · Wizarr · Cleanuparr
