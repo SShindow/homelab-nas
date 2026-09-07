@@ -12,11 +12,11 @@ Each entry follows the same shape: what it looked like, what it actually was, an
 
 ### "localhost" is never another container
 
-**What it looked like:** Prowlarr→Sonarr, Prowlarr→Radarr, Prowlarr→Lidarr, Sonarr→qBittorrent, Radarr→qBittorrent all failed to connect on first setup, with the "Server" field defaulted to `http://localhost:<port>`.
+**What it looked like:** Prowlarr→Sonarr, Prowlarr→Radarr, Prowlarr→Lidarr, and every arr app's connection to its download client all failed to connect on first setup, with the "Server" field defaulted to `http://localhost:<port>`.
 
 **What it actually was:** every one of these apps runs as its own container. `localhost` from inside a container means *that container*, not the one you're trying to reach — a fundamentally different failure from an actual network or auth problem, but the error text ("cannot connect," "connection refused") looks identical to both.
 
-**The fix, every time:** swap `localhost` for the target container's name on the shared Docker bridge (`arrs-network`) — `http://prowlarr:9696`, `http://qbittorrent:8080`, `http://lidarr:8686`, etc. Docker's user-defined bridges give working container-name DNS automatically; no separate proxy network is needed for this.
+**The fix, every time:** swap `localhost` for the target container's name on the shared Docker bridge (`arrs-network`) — `http://prowlarr:9696`, `http://lidarr:8686`, etc. Docker's user-defined bridges give working container-name DNS automatically; no separate proxy network is needed for this.
 
 **Check first, reflexively:** any time two containers on the *same* Docker network won't talk to each other, and the config field still shows `localhost` or `127.0.0.1`, that's the first thing to fix — before assuming a real network, firewall, or auth problem.
 
@@ -34,7 +34,7 @@ Each entry follows the same shape: what it looked like, what it actually was, an
 
 ## 2. DNS / ISP interference (VNPT)
 
-**What it looked like, three separate times, in three different containers:** Prowlarr's Nyaa.si indexer failed repeatedly with `SSL connection could not be established`; Seerr's entire discover/search UI 500'd on every TMDB call; both looked at first like a broken indexer / broken app.
+**What it looked like, three separate times, in three different containers:** one of Prowlarr's configured indexers failed repeatedly with `SSL connection could not be established`; Seerr's entire discover/search UI 500'd on every TMDB call; both looked at first like a broken indexer / broken app.
 
 **What it actually was:** the containers' outbound DNS resolution goes through VNPT's (the Vietnamese ISP's) own resolvers by default, which intermittently interfere with specific external domains — confirmed by running `curl` for the same URL *inside* the affected container and getting a clean response every time, which ruled out a hard network/firewall block and pointed specifically at name resolution or resolver-side flakiness.
 
@@ -44,9 +44,9 @@ Each entry follows the same shape: what it looked like, what it actually was, an
 
 ## 3. Silent misconfiguration that looks like success
 
-**What it looked like:** qBittorrent categories (`movies`/`tv`/`music`) were created with correct save paths, but torrents kept landing in the default save path anyway.
+**What it looked like:** the download client's per-category save paths (`movies`/`tv`/`music`) were configured correctly, but items kept landing in the default save path anyway.
 
-**What it actually was:** `Default Torrent Management Mode` is deliberately kept on `Manual` (not `Automatic`, which risks silently breaking Sonarr/Radarr's hardlinks whenever a category or path changes) — but Manual mode **ignores per-category save paths entirely** unless a separate, easy-to-miss checkbox, `Use Category paths in Manual Mode`, is also enabled.
+**What it actually was:** a management-mode setting deliberately kept on manual (rather than automatic, which risks silently breaking Sonarr/Radarr's hardlinks whenever a category or path changes) — but manual mode **ignores per-category save paths entirely** unless a separate, easy-to-miss setting is also enabled. (Further specifics of the download client's configuration are intentionally omitted from this write-up — see the disclaimer in [Media Automation](arr-stack.md).)
 
 **What it actually was, a second time:** Radarr grabbed a 20–40GB Remux release under a profile intended to keep things space-reasonable. The `HD-1080p` quality profile *looks* like it means "1080p, reasonably sized" but actually includes Remux-1080p (an essentially uncompressed Blu-ray rip) as an allowed, top-ranked tier within that bucket.
 
