@@ -84,6 +84,8 @@ This project's NAS is administered entirely remotely (see the [README](../README
 
 **Step 1 — find which disk, and what kind of error.** The Storage Dashboard's top-level VDEV card only shows a pool-wide summary; drilling into **View VDEVs** shows each physical disk's individual status and error counts. `zpool status -v <pool>` gives the same information from the shell, plus the pool's own recommended action.
 
+![Storage → tank VDEVs, per-disk read/write/checksum error counts](img/troubleshooting-zfs-vdev-status.png)
+
 **Step 2 — distinguish "device unreachable" from "media failure" from the error type, before assuming the worst.** `sudo smartctl -a /dev/<disk>` failing outright with `INQUIRY failed` (not a SMART-data readout, a total failure to even query the device) escalates concern one level. But the real diagnostic signal was in the kernel log:
 
 ```
@@ -97,6 +99,24 @@ A `hostbyte=DID_BAD_TARGET` result specifically means the SATA controller couldn
 **Step 4 — `zpool clear` + a scrub, not just a resilver, before declaring victory.** A resilver completing with "0 errors" only proves the *specific blocks it touched* are fine. A full `zpool scrub` reads and verifies every block in the pool — and in this case, it found the same disk's checksum-error count climb from 4 to 19 *after* the resilver had already reported clean, which meaningfully changed the read on the situation from "one-off blip, probably fine" to "recurring pattern, plan an actual replacement." Neither result meant data was lost — a healthy mirror repairs checksum mismatches automatically from the other disk, and `errors: No known data errors` held true throughout — but the trend across two different error types on the same physical disk was the real signal, not either single event in isolation.
 
 **Check first, next time an alert like this appears:** get the specific disk and error type before doing anything (View VDEVs / `zpool status -v`); check `dmesg` for the error class before assuming a dead drive; try a reboot as a legitimate diagnostic step, not just a last resort; and treat a resilver's "0 errors" as necessary but not sufficient — a scrub is the real all-clear.
+
+**Resolution, confirmed 2026-09-06.** After `zpool clear` and a subsequent full scrub, the pool came back completely clean on both disks — the real all-clear this incident was checking for:
+
+```
+truenas_admin@truenas[~]$ zpool status -v tank
+  pool: tank
+ state: ONLINE
+  scan: scrub repaired 60K in 04:06:25 with 0 errors on Sun Sep  6 07:57:04 2026
+config:
+        NAME                                      STATE     READ WRITE CKSUM
+        tank                                      ONLINE       0     0     0
+          mirror-0                                ONLINE       0     0     0
+            235114ed-133d-412e-8a31-55ecbfbe1bc7  ONLINE       0     0     0
+            88d12cfa-ba2b-4fec-8e5d-6af61c26d682  ONLINE       0     0     0
+errors: No known data errors
+```
+
+The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above). The planned physical drive replacement (see the [README](../README.md#hardware)) is now a precaution for next time, not an active fix.
 
 ## Meta-lessons
 
