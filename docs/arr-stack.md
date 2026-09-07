@@ -10,6 +10,8 @@
 
 **Note on continuity:** the initial deploy work for this module was done in a separate chat session, then brought back into this project's tracking with screenshots and live container output as the source of truth — worth stating since an earlier compose draft (env-var-driven, with a separate reverse-proxy network) floating around in this project's notes was **not** what actually got built. Everything below reflects what is actually running.
 
+![Seerr's Discover page — the friend-facing front door to the whole pipeline](img/arr-stack-seerr-discover.png)
+
 ## Architecture
 
 Nine containers, deployed as a single TrueNAS SCALE Custom App (`arr-stack`, via Apps → Discover Apps → Custom App → Install via YAML) on one Docker bridge network, `arrs-network`. A user-defined bridge gives working container-name DNS (e.g. `http://sonarr:8989` resolves between containers) with no separate reverse-proxy network needed. No reverse proxy is used — every service gets a direct TrueNAS-style high port, matching the convention already established by Prometheus/Grafana. Nothing is exposed through the router; everything is LAN/Tailscale-only.
@@ -42,6 +44,10 @@ All original services (through Seerr) run `PUID=568`/`PGID=568`/`UMASK=002` — 
 
 Every container that touches media (the download client, Sonarr, Radarr, Bazarr, Lidarr) mounts the **whole** `tank/media` dataset as a single `/data`, rather than separate volumes for downloads vs. library. This is the standard arr-stack pattern for a reason: with downloads and the library on the same filesystem, Sonarr/Radarr/Lidarr can hardlink or atomic-move a completed download into place instead of copying it — faster, and no duplicate-space window mid-import.
 
+![Sonarr's Series library](img/arr-stack-sonarr-library.png)
+
+![Radarr's Movies library](img/arr-stack-radarr-library.png)
+
 ## Deployment problems and fixes
 
 **Seerr crash-looped on first boot — `EACCES: permission denied, mkdir '/app/config/logs/'`.** The other linuxserver-based images auto-chown their bind-mounted `/config` to `PUID:PGID` via an s6-init step on container start. Seerr's image doesn't do that — its compose sets `user: "568:568"` directly with no init/chown step — so its config directory stayed owned by whatever created it (`root:root`, from Docker auto-creating the bind-mount path on first run). Fix: `sudo chown -R 568:568 /mnt/tank/appdata/arr/seerr` then restart. **General lesson: any non-linuxserver image added to this stack needs its config directory ownership checked manually** — the auto-chown behaviour isn't universal just because it's been reliable so far.
@@ -57,6 +63,8 @@ Every container that touches media (the download client, Sonarr, Radarr, Bazarr,
 ## Source aggregation (Prowlarr)
 
 Prowlarr aggregates multiple external sources and pushes working ones into the consumers that use them (Sonarr/Radarr/Lidarr) via sync. Redundancy was adopted deliberately after enough individual sources turned out to be unreliable for reasons with nothing to do with this NAS — no uptime guarantee, subject to outages and mirror rotation. Rather than chasing each source's uptime individually, the stack runs **several sources spread across categories** (movies, TV, anime) so Prowlarr silently routes around whichever one is down on a given day. Specific source names are intentionally omitted from this write-up, consistent with the disclaimer above; one source remains permanently unavailable due to an access restriction and isn't worth working around given coverage is already met elsewhere.
+
+![Prowlarr's Apps page — Lidarr/Radarr/Sonarr synced, with the actual source list intentionally not shown](img/arr-stack-prowlarr-apps.png)
 
 Sonarr and Radarr are connected to Prowlarr as Apps with Full Sync. One non-bug worth noting: a category-restricted source correctly shows up in only the relevant consumer (e.g. movies-only in Radarr but not Sonarr) — that's Prowlarr's category-aware sync working as intended, not a missing connection.
 
@@ -79,6 +87,8 @@ Lidarr was added as a 7th service on the same pattern as everything above (`lida
 That reframing changed the quality-profile decision too: `Lossless` (a strict FLAC/ALAC allow-list with no fallback) is a real risk for a broad auto-managed library, since it can leave an album permanently ungrabbed if no lossless release exists anywhere. For a small, manually-curated set of artists, that risk stops applying — any gap is immediately visible and decidable case by case — so the root folder's Quality Profile was set to `Lossless` deliberately.
 
 **Source coverage** — an existing source already in the stack for anime turned out to also cover this scope's needs well, with no new source configuration required (specific source names intentionally omitted, consistent with the disclaimer above).
+
+![Lidarr's library — Ado added and monitored, mid-testing](img/arr-stack-lidarr-artists.png)
 
 **Status: paused before the end-to-end test was confirmed complete**, for a genuinely practical reason: the desktop speakers in use (a budget Logitech Z523 2.1 set) aren't capable of resolving a lossless-vs-high-bitrate-lossy difference in practice, which undercuts the immediate payoff of the `Lossless` profile — the underlying reasoning (no lossless option locally) still holds, there's just no audible benefit on the current playback chain. Resume points, in order: (1) decide `Standard` vs. `Lossless` given real playback hardware — switching later is non-destructive, Lidarr just treats existing files as below-cutoff and searches for an upgrade; (2) confirm/retry the first Yoasobi download (never confirmed complete after a source went down mid-test); (3) add a Jellyfin Music library; (4) revisit Finamp for offline mobile listening.
 
@@ -116,6 +126,8 @@ Cleanuparr's container originally only had `/config` mounted — no access to th
 - One source remains permanently unavailable due to an access restriction; a known workaround exists but isn't pursued (not urgent, coverage already met by the other sources).
 - Lidarr paused mid-build — see the four resume points above.
 - HIMYM's Bazarr subtitle count is stuck at 182/208 (S06E21–24 English, ~20 episodes of S09 Vietnamese) — a manual search was triggered but the count never moved; accepted as-is rather than pursued further.
+
+  ![Bazarr's Series list — HIMYM's subtitle count stuck at 182/208](img/arr-stack-bazarr-subtitles.png)
 - HIMYM's old-codec (XviD) episode audit/selective-redownload was considered and explicitly deprioritized.
 - No reverse proxy — deferred by choice.
 - A download-client-specific behavior setting was found reverted to a state contradicting the originally-documented decision during a later health check (either changed in an untracked session, or the original change never actually applied). Fixed for the one affected item as a same-day workaround; has not visibly broken anything so far, but is only one data point against the original hardlink-safety concern — worth re-checking if Radarr/Sonarr imports ever start behaving oddly.
