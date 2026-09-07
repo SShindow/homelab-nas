@@ -117,9 +117,15 @@ The initial hypothesis — a stuck pull from `ghcr.io`, a registry nothing else 
 
 **End-to-end test: confirmed working.** Created a test invitation (1-day expiry, Movies + TV libraries), opened the link in a private browser window, created a Jellyfin account through it, logged in, and played a film successfully.
 
+![Wizarr's Create Invitation dialog](img/arr-stack-wizarr-invite.png)
+
+![Wizarr's Users page — friends' usernames and the one real email redacted](img/arr-stack-wizarr-users.png)
+
 ### Cleanuparr: the missing volume mount
 
 Cleanuparr's container originally only had `/config` mounted — no access to the actual downloaded files at all, unlike every other app in this stack, which meant its "Download Directory Source/Target" path-remapping fields could never actually work no matter what was typed into them. Fix: added the same `tank/media:/data` mount every other app already uses. With that in place, Cleanuparr sees files at the exact same path the download client reports, so both directory-remapping fields are correctly left blank — no translation needed. Connected to the download client and all three *arr apps via the standard container-name pattern (`http://sonarr:8989`, `http://radarr:7878`, `http://lidarr:8686`, plus the download client).
+
+![Cleanuparr's dashboard](img/arr-stack-cleanuparr-dashboard.png)
 
 ## Still open
 
