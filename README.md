@@ -189,7 +189,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Lidarr (music automation) — deployed and configured, paused before its end-to-end test; see [Media Automation](docs/arr-stack.md)
 - [ ] Tdarr (unified transcode format) — evaluated and declined for now, no HEVC-capable hardware in this NAS
 - [ ] CPU upgrade (Intel Core i7-4790, non-K) — planned for the next on-site visit, drop-in on the existing board
-- [ ] Replace the ZFS mirror disk that showed a real fault pattern this session — see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)
+- [ ] Keep an eye on the ZFS mirror disk that showed a fault pattern this session — a full scrub came back completely clean afterward, so this is now a monitor-and-replace-if-it-recurs precaution rather than an active to-do — see [Troubleshooting](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)
 
 ---
 

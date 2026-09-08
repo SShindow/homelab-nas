@@ -116,7 +116,7 @@ config:
 errors: No known data errors
 ```
 
-The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above). The planned physical drive replacement (see the [README](../README.md#hardware)) is now a precaution for next time, not an active fix.
+The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above). Replacing the drive is now a monitor-and-replace-if-it-recurs precaution rather than an active to-do — see the [Future Improvements checklist](../README.md#future-improvements).
 
 ## 8. A generic speedtest measures the wrong thing for cross-country remote access
 
