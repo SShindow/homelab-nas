@@ -118,6 +118,28 @@ errors: No known data errors
 
 The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above). The planned physical drive replacement (see the [README](../README.md#hardware)) is now a precaution for next time, not an active fix.
 
+## 8. A generic speedtest measures the wrong thing for cross-country remote access
+
+**What it looked like:** a movie streamed from Germany stuttered constantly, despite a speedtest run from the NAS itself showing a healthy 161 Mbps.
+
+**What it actually was:** a generic speedtest measures throughput to a nearby regional server, not the actual international route between the NAS and the specific remote device that matters. The real number can only come from measuring that exact path.
+
+**The fix:** run `iperf3` directly between the two real endpoints, over the real connection (Tailscale, in this case), in the same direction the traffic actually flows:
+
+```
+# On the NAS:
+iperf3 -s
+
+# On the remote client (the device that will actually be streaming):
+iperf3 -c <nas-tailscale-ip> -R -t 30
+```
+
+`-R` (reverse mode) makes the server push data to the client instead of the other way around — match this to whichever direction your real traffic flows (a media server pushing video to a remote viewer, in this project's case). `-t 30` gives a longer, more representative sample than the 10-second default.
+
+**A second finding worth its own entry: the result itself isn't fixed.** Running the exact same command between the exact same two endpoints three weeks apart gave **~3.78 Mbps** the first time and **~22.6 Mbps** the second — nearly a 6× difference, with no configuration change on either end. International routes can vary meaningfully day to day; a single measurement tells you what conditions were like *that day*, not a permanent ceiling. See [Media Streaming](media-jellyfin.md#real-world-remote-playback-throughput--variable-not-fixed-2026-08-28-updated-2026-09-08) for both measurements side by side.
+
+**Check first, next time a "why is this slow remotely" question comes up:** measure the actual path with `iperf3` before trusting a generic speedtest number, and don't treat a single `iperf3` run as the permanent answer — international links are subject to routing and congestion changes outside your control, so re-measure if something that used to work suddenly doesn't (or vice versa).
+
 ## Meta-lessons
 
 - **The same category of bug will recur across every new app you add to a stack, not just once.** `localhost`-vs-container-name alone was hit on at least five separate integrations across this project. Once a pattern like this is recognized, check for it *first* on the next new integration, rather than re-diagnosing from the error text each time.
@@ -125,3 +147,4 @@ The 60K repaired is well within normal — a healthy mirror silently fixing the 
 - **Raw ground truth (`docker ps`, `docker logs`, `docker top`, `dmesg`, `smartctl`) beats every layer of UI built on top of it**, every time a UI's status is ambiguous, stuck, or contradicts itself.
 - **"Vague error from an external-facing container" is a DNS suspect before it's a code or config suspect**, specifically on infrastructure sitting behind an ISP known to interfere with resolution.
 - **A metric that completes without error isn't automatically the whole answer** — a resilver reporting "0 errors" and a scrub afterward finding new checksum errors on the same disk are both true at once; the full picture needed both.
+- **A single measurement of a real-world network path is a snapshot, not a constant.** The same `iperf3` command between the same two endpoints returned ~3.78 Mbps and, three weeks later, ~22.6 Mbps — treat "I measured X" as "X was true when I measured it," not as a permanent fact to design around.

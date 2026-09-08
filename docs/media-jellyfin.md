@@ -179,19 +179,41 @@ Back in Germany, the prediction in "Still open" below was tested for real: does 
 
 Worth stating honestly rather than overclaiming: this can't be cleanly attributed to distance alone. The box carries more background load today than when the original transcode measurement was taken, so the same stall might already reproduce on the LAN. What's confirmed is that this specific transcode path is not currently reliable from Germany; what's unconfirmed is how much of that is distance versus a now-busier NAS.
 
-### Real-world remote playback throughput (2026-08-28)
+### Real-world remote playback throughput — variable, not fixed (2026-08-28, updated 2026-09-08)
 
 The Direct Play result above (1.98 Mbps, trivial) turned out **not to generalize** to higher-bitrate content — found via the [arr-stack](arr-stack.md)'s first real downloaded movie, not during planned testing. A newly-downloaded film (Blu-ray-tier 1080p x264 + EAC3 Atmos, 6.2 GiB) stuttered constantly when streamed live from Germany — freeze, catch up, repeat.
 
 **Ruled out in order:** NAS CPU (`top` showed 74.7% idle — the Atmos audio only needs a lightweight remux/"Direct Streaming," not a real transcode); a DERP-relayed Tailscale connection (`tailscale status` confirmed `direct <IP>:41641` — genuinely peer-to-peer); raw bandwidth (a generic speedtest from the NAS showed a healthy 161.83 Mbps upload).
 
-**Real cause, found with `iperf3` run directly over the Tailscale link** (NAS↔MacBook, reverse mode to match the actual streaming direction): sustained throughput was only **~3.78 Mbps**, with heavy retransmissions (128 retries in ~10s) and multiple full one-second windows of literal zero bytes transferred — a TCP congestion window collapsing from 180 KB to 8 KB, the signature of real packet loss on the international route rather than a bandwidth ceiling. The generic speedtest's 161 Mbps was measuring a nearby regional server, not the actual Vietnam→Germany hop — consistent with Vietnam's known international submarine-cable congestion, a structural ISP-level issue with no NAS-side or Jellyfin-side fix.
+**First measurement (2026-08-28), found with `iperf3` run directly over the Tailscale link** (NAS↔MacBook, reverse mode to match the actual streaming direction): sustained throughput was only **~3.78 Mbps**, with heavy retransmissions (128 retries in ~10s) and multiple full one-second windows of literal zero bytes transferred — a TCP congestion window collapsing from 180 KB to 8 KB, the signature of real packet loss on the international route at that moment. The generic speedtest's 161 Mbps was measuring a nearby regional server, not the actual Vietnam→Germany hop.
 
-**Practical workaround adopted:** manually cap Jellyfin's player Quality/bitrate setting for remote playback instead of Auto/Direct Play. ~1.5 Mbps still had occasional 1–2s freezes; the lowest available tier (~420 Kbps) eliminated freezing entirely but looked noticeably degraded. No bitrate gives both smooth playback and good quality simultaneously on this path — an honest structural limitation, not a config bug.
+**Second measurement (2026-09-08), same command, same route, three weeks later:**
 
-**Alternative researched and explicitly declined:** relocating the arr-stack + Jellyfin to a European-hosted seedbox/VPS would fix this at the root (a short Netherlands↔Germany hop instead of an intercontinental one). Bundled seedbox providers with one-click Radarr/Sonarr/Jellyfin run roughly €5–14/month; a DIY cheap-VPS-plus-storage route can run cheaper (~€3–10/month) but means rebuilding the whole stack. **Not pursued** — the actual use case for this stack is occasional downloads of rare films not on existing streaming subscriptions, not primary daily viewing, so the added recurring cost/complexity isn't justified. Revisit only if remote movie-watching becomes frequent enough to justify it.
+```
+$ iperf3 -c <nas-tailscale-ip> -R -t 30
+Connecting to host <nas-tailscale-ip>, port 5201
+Reverse mode, remote host <nas-tailscale-ip> is sending
+[  5] local 100.x.x.x port 52070 connected to <nas-tailscale-ip> port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec   256 KBytes  2.10 Mbits/sec
+[  5]   1.00-2.00   sec  1.88 MBytes  15.7 Mbits/sec
+[  5]   2.00-23.00  sec  ~2.75 MBytes/sec steady          ~23.1 Mbits/sec
+[  5]  23.00-24.00  sec  1.38 MBytes  11.5 Mbits/sec
+[  5]  24.00-25.00  sec  4.00 MBytes  33.5 Mbits/sec
+[  5]  28.00-30.00  sec  dips to 12.6, then 31.4 Mbits/sec
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-30.24  sec  81.6 MBytes  22.6 Mbits/sec  161            sender
+[  5]   0.00-30.00  sec  78.2 MBytes  21.9 Mbits/sec                 receiver
+```
 
-**Net takeaway:** Direct Play of already-low-bitrate content (TV episodes, ~2 Mbps) works fine live from Germany. Anything at a film's native Blu-ray-tier bitrate (typically 8–15+ Mbps) will not stream smoothly live — plan on either a heavily quality-capped live stream, or downloading the file first and playing it locally.
+**~22.6 Mbps sustained — nearly 6× the first measurement, with no dead windows at all** (some jitter and 161 retransmits over 30s, but nothing like the first run's total stalls). Same command, same two endpoints, same general route — the only thing that changed is time. **Conclusion revised: this route's real-world throughput is genuinely variable, not a fixed ceiling.** The underlying cause is still the same (an international hop subject to congestion/routing conditions outside this NAS's control, consistent with Vietnam's known submarine-cable congestion patterns) — but "variable, sometimes bad enough to break high-bitrate playback" is the honest framing, not "always ~3.78 Mbps."
+
+**Practical workaround, still in place:** manually cap Jellyfin's player Quality/bitrate setting for remote playback instead of Auto/Direct Play, since there's no way to know in advance which regime a given session will land in. ~1.5 Mbps still had occasional 1–2s freezes on the bad-conditions day; the lowest available tier (~420 Kbps) eliminated freezing entirely but looked noticeably degraded. On a good-conditions day (like the second measurement), a much higher cap — or even Direct Play at full bitrate — would likely work fine, but that isn't something to rely on without checking first.
+
+**Alternative researched and explicitly declined:** relocating the arr-stack + Jellyfin to a European-hosted seedbox/VPS would remove this variability at the root (a short Netherlands↔Germany hop instead of an intercontinental one). Bundled seedbox providers with one-click Radarr/Sonarr/Jellyfin run roughly €5–14/month; a DIY cheap-VPS-plus-storage route can run cheaper (~€3–10/month) but means rebuilding the whole stack. **Not pursued** — the actual use case for this stack is occasional downloads of rare films not on existing streaming subscriptions, not primary daily viewing, so the added recurring cost/complexity isn't justified. Revisit only if remote movie-watching becomes frequent enough to justify it.
+
+**Net takeaway:** Direct Play of already-low-bitrate content (TV episodes, ~2 Mbps) works fine live from Germany regardless of conditions. Anything at a film's native Blu-ray-tier bitrate (typically 8–15+ Mbps) is a gamble on this route — sometimes it would stream fine, sometimes it won't — so the safe default is still either a heavily quality-capped live stream, or downloading the file first and playing it locally. Worth re-measuring with `iperf3` before assuming either way on a given day; see [Troubleshooting](troubleshooting.md) for the reproduction steps.
 
 ## Gotchas
 
@@ -205,6 +227,6 @@ The Direct Play result above (1.98 Mbps, trivial) turned out **not to generalize
 - **Missing subtitles** — S06E21–24 English, ~20 episodes of S09 Vietnamese. [Bazarr](arr-stack.md) was connected and a search triggered, but the count never moved past 182/208 — accepted as-is rather than pursued further.
 - **Series and season poster art.** Episode thumbnails fetched correctly; the higher-level artwork did not.
 - ~~**Germany-distance playback test.**~~ Confirmed 2026-08-28 — see "Germany-distance verification" above. Direct play is bitrate-bound as predicted (~1.98 Mbps for one H.264 episode); the browser-transcode case, however, failed to start over real distance and needs revisiting once the arr-stack's added CPU load is accounted for.
-- **Real remote-playback throughput ceiling** (~3.78 Mbps sustained Vietnam↔Germany, see above) means Blu-ray-tier content needs a manual bitrate cap or a local download — accepted as a structural limitation for now given the stack's actual (occasional-download) usage pattern.
+- **Real remote-playback throughput is variable** (measured ~3.78 Mbps to ~22.6 Mbps Vietnam↔Germany on different days, see above) — Blu-ray-tier content needs a manual bitrate cap or a local download as the safe default, since there's no way to know in advance which regime a given session will land in. Accepted as-is given the stack's actual (occasional-download) usage pattern; re-measure with `iperf3` before trusting either extreme on a given day.
 
-**Status:** ✅ Operational — 208 episodes plus a growing Movies library (via the [arr-stack](arr-stack.md)) catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, the hardware-acceleration question closed with evidence, Direct Play confirmed working at real Germany↔Vietnam distance, and the real-world remote-throughput ceiling measured and worked around.
+**Status:** ✅ Operational — 208 episodes plus a growing Movies library (via the [arr-stack](arr-stack.md)) catalogued and streaming, config on durable storage, transcoding behaviour measured and understood, the hardware-acceleration question closed with evidence, Direct Play confirmed working at real Germany↔Vietnam distance, and the real-world remote-throughput variability measured (twice) and worked around.
