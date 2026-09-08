@@ -5,7 +5,7 @@ All notable changes to this project are documented here, in the order they were 
 ## [Unreleased]
 - Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - CPU upgrade to an Intel Core i7-4790 (non-K) planned for the next on-site visit; not yet installed
-- Disk replacement planned for the ZFS pool's recurring-checksum-error drive (see the [ZFS pool disk fault](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware) entry below)
+- **Active:** replacing both ZFS mirror disks (WD Green → WD Red Plus, 4TB) after a third fault on the same disk left the pool running `DEGRADED` with zero redundancy (see the [ZFS pool disk fault](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware) entry below)
 - Lidarr paused mid-build — resume points tracked in [Media Automation](docs/arr-stack.md#extension-lidarr-music--paused-curated-artist-scope)
 
 ## 2026 — Friend access: Wizarr + Cleanuparr
@@ -27,6 +27,7 @@ All notable changes to this project are documented here, in the order they were 
 - `errors: No known data errors` held true throughout — a healthy mirror repairs checksum mismatches automatically from the other disk — but the trend, not either single event, was the real signal
 - Corrected the hardware record along the way: at least `sda` is a WD Green WDC_WD20EZRX-00D8PB0 (5400 RPM), not a Seagate as originally logged
 - Ran `zpool clear` and planned a physical drive replacement for the next on-site visit; full remote diagnostic method captured in the [Troubleshooting Playbook](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)
+- **2026-09-08 — the same disk faulted a third time**, this time a genuine `FAULTED` state (6 read / 439 write errors, still zero checksum errors) rather than just elevated counters — pool now `DEGRADED`, running on the mirror's other disk alone with zero redundancy. A SMART pull on that other disk turned up an independent finding: it's accumulating head-parking cycles at a rate consistent with WD Green's known "IntelliPark" issue, on pace to hit WD's own rated wear limit within a year. **Decision: replace both mirror disks with NAS-rated WD Red Plus (4TB), not just the one that's actively faulted** — full detail and the SMART data in the [Troubleshooting Playbook](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware)
 
 ## 2026 — Media Automation: the arr-stack (Prowlarr, a download client, Sonarr, Radarr, Bazarr, Seerr) + Lidarr
 

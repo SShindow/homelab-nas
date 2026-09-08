@@ -116,7 +116,31 @@ config:
 errors: No known data errors
 ```
 
-The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above). Replacing the drive is now a monitor-and-replace-if-it-recurs precaution rather than an active to-do — see the [Future Improvements checklist](../README.md#future-improvements).
+The 60K repaired is well within normal — a healthy mirror silently fixing the odd checksum mismatch from the other disk is exactly the redundancy working as intended, not a sign of an ongoing problem. Both disks show zero read/write/checksum errors in the Storage Dashboard as well (see screenshot above).
+
+**Update, 2026-09-08 — recurred a third time; this is a failing drive, not a cable issue.** Two days later, the same physical disk (`sda`, device GUID `88d12cfa-...`) faulted again, this time with a genuine `FAULTED` state rather than just elevated counters:
+
+```
+  pool: tank
+ state: DEGRADED
+status: One or more devices are faulted in response to persistent errors.
+        Sufficient replicas exist for the pool to continue functioning in a
+        degraded state.
+action: Replace the faulted device, or use 'zpool clear' to mark the device
+        repaired.
+  scan: scrub repaired 0B in 00:39:18 with 0 errors on Mon Sep  7 20:49:59 2026
+config:
+        NAME                                      STATE     READ WRITE CKSUM
+        tank                                      DEGRADED     0     0     0
+          mirror-0                                DEGRADED     0     0     0
+            235114ed-133d-412e-8a31-55ecbfbe1bc7  ONLINE       0     0     0
+            88d12cfa-ba2b-4fec-8e5d-6af61c26d682  FAULTED      6   439     0  too many errors
+errors: No known data errors
+```
+
+Same signature as the original incident — heavy write errors (439) against very few read errors (6) and zero checksum errors, still consistent with a connection/bus-level fault rather than confirmed platter media failure — but this is now the **third** distinct fault event on this exact disk in roughly two days (initial `DID_BAD_TARGET` disconnect → climbing checksum errors post-resilver → this). `zpool clear` had already been run once between the first two events with no lasting effect; at this point, clearing the fault again and hoping is not a credible plan. `errors: No known data errors` still held — the mirror's other disk (`235114ed-...`) is healthy and carrying the pool alone — but the pool is running with **zero redundancy** until this disk is physically replaced, which is a materially different risk level than "one disk is a bit suspicious."
+
+A SMART pull on the *other* disk (`sdc` in the earlier VDEV view, WD Green `WD20EARX-008FB0`) turned up a second, independent finding while assessing replacement options: it's accumulating `Load_Cycle_Count` at roughly 697 cycles/day (56,911 cycles over 1,960 power-on hours) — squarely in the documented range for WD Green's aggressive "IntelliPark" head-parking behavior under NAS-style access patterns, and on pace to hit WD's own rated 300,000-cycle limit in under a year if left unchanged. No reallocated/pending sectors or read errors yet, so it isn't failing the way `sda` is, but it's the same non-NAS-rated drive family aging via the mechanically riskiest pattern that family is known for. **Both mirror disks are being replaced with NAS-rated drives (WD Red Plus, 4TB), not just the one that's actively faulted.**
 
 ## 8. A generic speedtest measures the wrong thing for cross-country remote access
 
