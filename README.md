@@ -17,6 +17,8 @@ I wanted reliable, secure access to personal files across countries and devices 
 
 This is a living project — new capabilities are added and documented incrementally as they're built.
 
+![TrueNAS Apps — Installed, everything running together](docs/img/truenas-apps-dashboard.png)
+
 ## Architecture
 
 | Layer | Technology |
