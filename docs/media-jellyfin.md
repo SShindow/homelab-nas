@@ -75,7 +75,8 @@ The catch is that this safety net is decaying. No periodic task creates new snap
 
 | Setting | Value |
 |---|---|
-| Web UI port | `30014` (TrueNAS-assigned — **not** the documented 8096) |
+| Web UI port | `30013` (TrueNAS-assigned HTTP, mapped from 8096 — **not** the documented 8096 itself) |
+| HTTPS port | `30014` (mapped from 8920) — present but unusable, no valid certificate configured |
 | Library mount | `/mnt/tank/media` → `/media`, **read-only** |
 | Server name | `truenas-jellyfin` |
 | Library | type *Shows*, path `/media/tv` |

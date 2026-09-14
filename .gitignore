@@ -20,3 +20,9 @@ configs/*.local.*
 *tskey*
 *authkey*
 *.token
+
+# Dashboard / service config containing plaintext API keys and passwords
+services.yaml
+homepage/
+*services.yaml
+*widgets.yaml

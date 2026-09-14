@@ -3,10 +3,20 @@
 All notable changes to this project are documented here, in the order they were built. This project is developed and documented incrementally — each entry reflects a real, completed milestone rather than a planned roadmap.
 
 ## [Unreleased]
-- Evaluating GTX 650 reinstallation for Jellyfin hardware transcoding
 - CPU upgrade to an Intel Core i7-4790 (non-K) planned for the next on-site visit; not yet installed
 - **Active:** replacing both ZFS mirror disks (WD Green → WD Red Plus, 4TB) after a third fault on the same disk left the pool running `DEGRADED` with zero redundancy (see the [ZFS pool disk fault](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware) entry below)
 - Lidarr paused mid-build — resume points tracked in [Media Automation](docs/arr-stack.md#extension-lidarr-music--paused-curated-artist-scope)
+
+## 2026 — Dashboard: Homepage
+- Added a single YAML-configured dashboard indexing every service on the box, working identically from the Vietnam LAN and from Germany over Tailscale
+- Chose Homepage over Homarr on config-as-code grounds (plain YAML, diffable, no database) and footprint, accepting a worse editing experience in exchange; also noted that Homarr is unrelated to the Servarr/*arr family despite the name
+- Deployed as a standalone Custom App rather than folding it into the arr-stack compose file, since Homepage has no service-to-service dependency on those containers
+- Hit the `chown 568:568` new-dataset ownership gotcha for the third time in this project — now done preemptively rather than diagnosed
+- Documented `HOMEPAGE_ALLOWED_HOSTS`: Next.js host-header validation rejects any unlisted address, and changing the value needs the container recreated rather than restarted
+- Diagnosed repeated `context deadline exceeded` registry-pull failures by reading `app_lifecycle.log` rather than retrying: the same signature had already hit twice (lscr.io, Docker Hub) on 31 August. Root cause was overseas pulls competing with a concurrent rsync backup over the same thin international route, not anything registry- or app-specific
+- Wired live widgets for seven services; recorded that Seerr-family API keys are long base64 strings rather than the *arr* family's 32-char hex
+- Left Wizarr and Cleanuparr as plain link tiles — no native widget exists for either upstream
+- Extended `.gitignore` to cover `services.yaml`, which holds five plaintext API keys and a service password that the previous secret patterns would not have matched
 
 ## 2026 — Friend access: Wizarr + Cleanuparr
 - Added once the plan changed from "one test account" to eventually sharing Jellyfin with up to ~10 friends across Vietnam, Germany, and the US

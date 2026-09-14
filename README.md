@@ -34,6 +34,7 @@ This is a living project — new capabilities are added and documented increment
 | Personal VPN / Internet Egress | Tailscale Exit Node (NAS advertises `0.0.0.0/0` + `::/0`) |
 | Video Surveillance / NVR | Frigate (RTSP from Tapo C200, recorded to the ZFS pool) |
 | Observability | Prometheus + Grafana, with node_exporter as a host binary |
+| Dashboard | Homepage (YAML-configured service index, identical on LAN and over Tailscale) |
 | Media Streaming | Jellyfin (library on ZFS, read-only mount, no transcoding in normal use) |
 | Media Automation | Prowlarr → Sonarr/Radarr/Lidarr → download client → Bazarr → Seerr, request-to-playback pipeline for TV/movies/music |
 | Friend Access | Wizarr (self-service Jellyfin invites) + Cleanuparr (stalled-download cleanup) |
@@ -81,6 +82,7 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | **[Observability](docs/monitoring-prometheus-grafana.md)** | Prometheus + Grafana with a host-installed node_exporter, persistent host-path config, reboot-verified. | ✅ Operational |
 | **[Media Streaming](docs/media-jellyfin.md)** | Jellyfin serving a growing library from the ZFS pool, with transcoding behaviour and real remote-throughput limits measured. | ✅ Operational |
 | **[Media Automation (arr-stack)](docs/arr-stack.md)** | Seerr → Prowlarr → Sonarr/Radarr/Lidarr → download client → Bazarr request-to-playback pipeline, plus Wizarr/Cleanuparr for friend access. See the module's own disclaimer. | ✅ Operational (Lidarr paused) |
+| **[Dashboard (Homepage)](docs/homepage.md)** | One YAML-configured page reaching every service on the box, with live widgets, working identically from the LAN or from Germany. | ✅ Operational |
 
 **[Troubleshooting Playbook](docs/troubleshooting.md)** — recurring problem patterns collected across every module above (container networking, ISP DNS interference, storage diagnostics, and more), grouped by root cause rather than by which module happened to surface each one first.
 
@@ -165,6 +167,9 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [x] ~~System metrics collection and dashboards~~ → done via [Prometheus + Grafana](docs/monitoring-prometheus-grafana.md)
 - [ ] Alert rules on top of Prometheus (disk >85%, sustained CPU >80%) — metrics exist, alerting doesn't yet
 - [ ] Uptime Kuma for service-reachability checks — complements Grafana rather than duplicating it (Grafana answers "how is the box doing", Uptime Kuma answers "is the service reachable")
+- [ ] Homepage `customapi` widgets for Wizarr and Cleanuparr, if either ever exposes a documented API
+- [ ] Move Homepage's API keys out of `services.yaml` into environment-variable substitution
+- [ ] Document Immich as a module — it runs on the box but appears nowhere in these docs
 - [ ] ZFS-specific Grafana dashboard using the `node_zfs_*` collector
 - [ ] TLS / basic auth in front of node_exporter's `/metrics` endpoint
 - [ ] Nextcloud (personal cloud), Vaultwarden (password manager), Pi-hole (network-wide ad blocking)
@@ -193,4 +198,4 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 
 ---
 
-**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin · Prowlarr · Sonarr · Radarr · Lidarr · Bazarr · a download client · Seerr (Jellyseerr) · Wizarr · Cleanuparr
+**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin · Homepage · Prowlarr · Sonarr · Radarr · Lidarr · Bazarr · a download client · Seerr (Jellyseerr) · Wizarr · Cleanuparr

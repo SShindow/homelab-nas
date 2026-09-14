@@ -1,5 +1,5 @@
-<svg viewBox="0 0 900 1220" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-  <rect width="900" height="1220" fill="#0f172a"/>
+<svg viewBox="0 0 900 1350" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="900" height="1350" fill="#0f172a"/>
 
   <text x="450" y="40" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">Home NAS — Remote Access Architecture</text>
 
@@ -137,6 +137,16 @@
     <text x="60" y="1146" fill="#64748b" font-size="11">Library migration: 35 GB moved by zfs rename (metadata-only) · two rm -rf mistakes recovered from .zfs/snapshot/</text>
   </g>
 
-  <text x="450" y="1180" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
-  <text x="450" y="1198" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
+  
+  <!-- Dashboard -->
+  <g>
+    <rect x="40" y="1168" width="820" height="108" rx="10" fill="#1e293b" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="60" y="1196" fill="#a7f3d0" font-size="14" font-weight="700">🧭 Dashboard (Homepage)</text>
+    <text x="60" y="1220" fill="#e2e8f0" font-size="12">One YAML-configured page indexing every service · reached at the NAS's Tailscale address, so LAN and Germany behave identically</text>
+    <text x="60" y="1240" fill="#94a3b8" font-size="11">Four groups: Media · Automation · Monitoring · Infrastructure · live widgets on the seven apps that support them</text>
+    <text x="60" y="1258" fill="#64748b" font-size="11">services.yaml holds plaintext API keys — gitignored, never screenshotted · no database, chosen over Homarr for config-as-code</text>
+  </g>
+
+  <text x="450" y="1310" text-anchor="middle" fill="#64748b" font-size="12">Client ↔ Tailscale VPN (encrypted mesh) ↔ NAS SMB share — no exposed public IP</text>
+  <text x="450" y="1328" text-anchor="middle" fill="#64748b" font-size="12">Google Drive → NAS: scheduled one-way backup, adds/updates only, never deletes locally</text>
 </svg>

@@ -26,7 +26,7 @@ Each entry follows the same shape: what it looked like, what it actually was, an
 
 **What it actually was:** container-name DNS only works between containers on the *same* Docker bridge. Jellyfin, Prometheus, and Grafana each run as their own separate TrueNAS App, on their own separate Docker network — container-name resolution simply doesn't cross that boundary.
 
-**The fix:** address the **host's LAN IP** instead (`192.168.1.4:30014` for Jellyfin, `192.168.1.4:30104` for Prometheus) — every app's published port is reachable there regardless of which Docker network it's actually on.
+**The fix:** address the **host's LAN IP** instead (`192.168.1.4:30013` for Jellyfin, `192.168.1.4:30104` for Prometheus) — every app's published port is reachable there regardless of which Docker network it's actually on.
 
 **The exception that cost real time:** Wizarr needed the opposite answer for the same-shaped problem — reaching Jellyfin required the NAS's own **Tailscale IP**, not its LAN IP, even though Seerr (solving the identical problem) used the LAN IP successfully. The library-scan step silently returned nothing with the LAN IP and worked immediately with the Tailscale IP. Root cause not fully pinned down; the takeaway is **don't assume the LAN-IP fix generalizes to every new tool** — if a working pattern from one app doesn't work for a new one solving the same kind of problem, try the Tailscale IP as the next thing, not more troubleshooting of the LAN-IP path.
 
