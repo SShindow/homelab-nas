@@ -119,4 +119,18 @@ That ~1.42 Mbps is application-level data for one modest-bitrate stream — it i
 - **Single copy.** Footage lives on the ZFS mirror — redundant against a disk failure, but it is not backed up off-site the way the Google Drive dataset is.
 - **Cross-country access is now verified.** ~~Remote viewing was tested from cellular *within Vietnam*; a real Germany↔Vietnam figure is still pending.~~ Confirmed 2026-08-28 from a real Germany connection: ~0.74 Mbps for the live view, reachable and usable at real distance.
 
-**Status:** ✅ Operational — recording continuously to the ZFS pool, surviving full reboots unattended, benchmarked end to end (including a real Germany↔Vietnam cross-country figure), and reachable remotely over Tailscale. Vendor cloud carries none of the footage.
+## Decommissioned (2026-09)
+
+This module was retired deliberately. It worked, it was verified, and it was removed anyway — which is worth recording as an outcome rather than quietly deleting.
+
+**What it cost, measured rather than estimated:** 36.4 GB of pool and 13–15% sustained CPU on a two-core box. Worth noting that the 36.4 GB actual came in well under the ~83 GB the original 11.8 GB/day projection implied — the measured 319 MiB/hour figure was the accurate one, and the early estimate was not.
+
+**Why it was retired:** the vendor app covers live viewing and adds two-way audio, which Frigate could not do for this camera. Once that was true, the module's remaining advantage was local recording alone.
+
+**The trade, accepted knowingly:** recordings return to the camera's SD card, and the stream returns to the vendor cloud — reversing this module's original goal. That is a real loss of the local-only property, taken on purpose rather than by drift.
+
+**What the removal funded:** the reclaimed 36.4 GB and the CPU headroom are exactly what made [Immich](photos-immich.md) comfortable to add. Load average dropped from 2.09 to ~1.15.
+
+**Preserved on the way out:** the working `config.yaml` was archived to the pool before removal, so the ONVIF-probe workaround, the admin-password fix and the retention-schema findings survive if this is ever revisited. The camera's DHCP reservation was retained.
+
+**Status:** ⏹️ **Decommissioned (2026-09)** — operated and verified as described above, then retired when the vendor app covered the use case better. Everything below the Decommissioned heading describes the system as it ran, and is kept for the findings rather than as current state.

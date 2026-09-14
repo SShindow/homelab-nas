@@ -6,6 +6,32 @@ All notable changes to this project are documented here, in the order they were 
 - CPU upgrade to an Intel Core i7-4790 (non-K) planned for the next on-site visit; not yet installed
 - **Active:** replacing both ZFS mirror disks (WD Green → WD Red Plus, 4TB) after a third fault on the same disk left the pool running `DEGRADED` with zero redundancy (see the [ZFS pool disk fault](docs/troubleshooting.md#7-storage-diagnosing-a-faulted-disk-without-touching-hardware) entry below)
 - Lidarr paused mid-build — resume points tracked in [Media Automation](docs/arr-stack.md#extension-lidarr-music--paused-curated-artist-scope)
+- Re-measurement of the Vietnam↔Germany throughput ceiling outstanding — figures taken during the Immich build are 5–10× higher than the number currently documented, which several decisions depend on
+- Re-test outstanding on whether the arr-stack's per-container `dns:` overrides actually function, given the ISP appears to block port 53 to third-party resolvers
+
+## 2026 — Self-hosted photo management (Immich)
+- Replaced a full, paid 50 GB consumer cloud photo tier with a self-hosted Immich instance — four containers from the TrueNAS community catalogue (server, PostgreSQL 18 + vector, Redis, ML), on host-path datasets rather than the ixVolume default
+- The motivating problem was that the paid tier being full meant photo sync had silently stopped, leaving the phone's camera roll with **no backup at all** — fixing that came first, dropping the subscription second
+- Placed `tank/immich` at the top level of the pool alongside `tank/media` rather than under `tank/appdata`, on the reasoning that photos are primary user data rather than application config, and deserve their own snapshot and replication schedule
+- Created snapshot tasks **before installing the app** (daily/2-week + weekly/8-week, recursive) so the library was never unprotected — with longer retention than the documents dataset, since a bad photo deletion goes unnoticed far longer
+- Set four things deliberately before the first upload, each cheap on an empty library and expensive afterwards: a date-based storage template (so the library stays readable as a plain year/month folder tree with or without the app), HEVC/VP9/AV1 added to the accepted-codec list (the H.264-only default would have queued *every* modern phone video for a software transcode this CPU can't do), ML jobs disabled, and scheduled database dumps timed to avoid overlapping the snapshot tasks
+- **Decommissioned Frigate immediately beforehand** to fund the capacity — 36.4 GB of pool and 13–15% sustained CPU reclaimed, load average down from 2.09 to ~1.15
+- Found the TrueNAS **Apps dataset preset sets the ACL type but not ownership** — datasets came out `root:root` despite the preset's name and the app's own documentation implying otherwise; the same class of failure that crash-looped Seerr in the arr-stack
+- Diagnosed a failed install through three wrong hypotheses (permissions, IPv6-only DNS answers, international transit congestion) before finding the real cause: **the home router had stopped forwarding entirely**, with cached DNS and an established VPN session making the box look alive while every new TCP connection failed
+- Established that **`ping` is not a usable diagnostic on this network** — the ISP's ONT drops ICMP, so the NAS cannot ping its own gateway on a healthy LAN. `curl` and `getent` separate DNS resolution from TCP reachability and were what found the fault
+- Found that switching to third-party DNS resolvers broke resolution entirely rather than fixing it — the ISP appears to block outbound port 53. This calls the arr-stack's documented per-container `dns:` overrides into question; flagged for re-test rather than silently corrected
+- Found and capped a runaway download-client process consuming 112% CPU and 2.3 GB RSS with the kernel thrashing on memory reclaim — the stack's documented config covered a seeding ratio limit but never connection counts
+- Added multi-user isolation for a separate category of media — documented explicitly as **access isolation, not encryption**: files remain unencrypted on the pool and readable by anyone with shell access, a snapshot, or the disks
+- Pulled both the photo library and the private documents dataset to an external SSD in the other country — verified with matching counts and sizes, then a full `rsync --checksum` pass confirming 11,454 files byte-identical
+- Hit a silent-data-loss failure mode: **`rsync -a` to a Windows drive under WSL transfers files and then discards them**, because `drvfs` can't set Unix metadata and archive mode fails on `mkstemp`. Fixed with `--inplace` and the `--no-*` metadata flags
+- Measured Immich storing roughly **1.6× what it ingests** once thumbnails, previews and encoded derivatives are generated — 7.5 GB uploaded produced 11.96 GB on the pool
+- **Re-measured the Vietnam↔Germany path at 18.7 Mbps (`iperf3`) and ~39 Mbps sustained on large files** — 5–10× the ~3.78 Mbps figure the Jellyfin module records and several decisions depend on. Different client machine, so not a clean like-for-like; flagged for proper re-test rather than amended. Also measured ~4.3 Mbps on 36,629 small files, showing file size dominates throughput on a high-latency path
+
+## 2026 — Camera NVR decommissioned
+- Retired Frigate after measuring its real cost (36.4 GB of pool, 13–15% sustained CPU) against what the vendor app already provided — live viewing plus two-way audio Frigate could not do for this camera
+- Trade accepted knowingly: recordings return to the camera's SD card and the stream returns to the vendor cloud, reversing the module's original local-only goal
+- Archived the working `config.yaml` to the pool first, so the ONVIF-probe, admin-password and retention-schema findings survive a possible revisit; kept the camera's DHCP reservation
+- The reclaimed capacity is what made the Immich build comfortable on a two-core box
 
 ## 2026 — Dashboard: Homepage
 - Added a single YAML-configured dashboard indexing every service on the box, working identically from the Vietnam LAN and from Germany over Tailscale

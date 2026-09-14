@@ -14,6 +14,7 @@ I wanted reliable, secure access to personal files across countries and devices 
 - No reliance on commercial cloud storage
 - Persistent, low-maintenance setup that survives reboots
 - Automated backup of critical cloud files (Google Drive) to local storage
+- Self-hosted photo/video library replacing a paid consumer cloud tier
 
 This is a living project — new capabilities are added and documented incrementally as they're built.
 
@@ -32,9 +33,10 @@ This is a living project — new capabilities are added and documented increment
 | Cloud Backup | TrueNAS Cloud Sync Task (rclone) — Google Drive → NAS |
 | Local Point-in-Time Recovery | ZFS periodic snapshots (daily + weekly) |
 | Personal VPN / Internet Egress | Tailscale Exit Node (NAS advertises `0.0.0.0/0` + `::/0`) |
-| Video Surveillance / NVR | Frigate (RTSP from Tapo C200, recorded to the ZFS pool) |
+| Video Surveillance / NVR | Frigate — **decommissioned**, see [Camera NVR](docs/camera-nvr-frigate.md) |
 | Observability | Prometheus + Grafana, with node_exporter as a host binary |
 | Dashboard | Homepage (YAML-configured service index, identical on LAN and over Tailscale) |
+| Photo Management | Immich (mobile auto-backup, date-structured library on ZFS, multi-user isolation) |
 | Media Streaming | Jellyfin (library on ZFS, read-only mount, no transcoding in normal use) |
 | Media Automation | Prowlarr → Sonarr/Radarr/Lidarr → download client → Bazarr → Seerr, request-to-playback pipeline for TV/movies/music |
 | Friend Access | Wizarr (self-service Jellyfin invites) + Cleanuparr (stalled-download cleanup) |
@@ -78,11 +80,12 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | **[Power-Loss Resilience](docs/power-loss-resilience.md)** | Root-caused a failing CMOS battery that silently reset the BIOS auto-power-on setting; verified with a real fuse cut. | ✅ Verified |
 | **[ZFS Snapshot Strategy](docs/zfs-snapshots.md)** | Daily and weekly periodic snapshots for instant local point-in-time recovery, layered with the off-site cloud copy. | ✅ Operational |
 | **[Tailscale Exit Node](docs/tailscale-exit-node.md)** | The NAS as a personal VPN egress, plus a subnet router extension reaching the whole home LAN remotely. | ✅ Verified |
-| **[Camera NVR (Frigate)](docs/camera-nvr-frigate.md)** | Tapo C200 RTSP recorded to the ZFS pool with no vendor cloud, plus end-to-end performance benchmarking. | ✅ Operational |
+| **[Camera NVR (Frigate)](docs/camera-nvr-frigate.md)** | Tapo C200 RTSP recorded to the ZFS pool with no vendor cloud, plus end-to-end performance benchmarking. Retired once two-way audio outweighed local recording. | ⏹️ Decommissioned |
 | **[Observability](docs/monitoring-prometheus-grafana.md)** | Prometheus + Grafana with a host-installed node_exporter, persistent host-path config, reboot-verified. | ✅ Operational |
 | **[Media Streaming](docs/media-jellyfin.md)** | Jellyfin serving a growing library from the ZFS pool, with transcoding behaviour and real remote-throughput limits measured. | ✅ Operational |
 | **[Media Automation (arr-stack)](docs/arr-stack.md)** | Seerr → Prowlarr → Sonarr/Radarr/Lidarr → download client → Bazarr request-to-playback pipeline, plus Wizarr/Cleanuparr for friend access. See the module's own disclaimer. | ✅ Operational (Lidarr paused) |
 | **[Dashboard (Homepage)](docs/homepage.md)** | One YAML-configured page reaching every service on the box, with live widgets, working identically from the LAN or from Germany. | ✅ Operational |
+| **[Photo Management](docs/photos-immich.md)** | Immich replacing a paid 50 GB cloud photo tier — mobile auto-backup, a library that stays readable without the app, and a checksum-verified off-site copy. | ✅ Operational |
 
 **[Troubleshooting Playbook](docs/troubleshooting.md)** — recurring problem patterns collected across every module above (container networking, ISP DNS interference, storage diagnostics, and more), grouped by root cause rather than by which module happened to surface each one first.
 
@@ -104,6 +107,11 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 | Prometheus refused connections on every attempt | TrueNAS launches it with `--web.listen-address=0.0.0.0:30104`, not the documented default 9090 | Used the TrueNAS-assigned port everywhere, including the self-scrape target (`localhost:30104`) |
 | Prometheus was running and healthy but collecting nothing — "No scrape pools found" | TrueNAS ships the app with an empty scrape config and no bundled exporter | Wrote `prometheus.yml` by hand and installed node_exporter separately on the host |
 | Grafana could not reach Prometheus by service name or container IP | The two apps sit on separate Docker bridge networks, so container DNS doesn't resolve between them | Addressed the host's LAN IP (`192.168.1.4:30104`) instead of the container |
+| A TrueNAS app install failed at the image-pull stage, and an unrelated app had been failing the same way for hours | The home router had stopped forwarding traffic entirely — DNS still answered from cache and the established VPN session survived, so the box looked alive while every *new* TCP connection failed | Waited for the router to recover; the install then succeeded unchanged. Three plausible hypotheses (permissions, IPv6-only DNS answers, international transit congestion) were tested and eliminated first |
+| `ping` actively misled that diagnosis, four times over | The ISP's ONT drops ICMP echo, so the NAS cannot ping *its own gateway* even on a fully healthy LAN; public resolvers appear filtered the same way | Used `curl`, `getent` and `getent ahosts` to separate DNS resolution from TCP reachability. On this network a failed ping carries no information |
+| Switching the NAS's nameservers to Cloudflare/Google broke DNS completely rather than fixing it | The ISP appears to block outbound port 53 to third-party resolvers, forcing traffic onto its own DNS | Reverted. Also calls into question the per-container `dns:` overrides documented in [Media Automation](docs/arr-stack.md) — flagged for re-test, not silently amended |
+| A dataset created with the TrueNAS **Apps** preset was still owned `root:root`, and the app couldn't write to it | The preset sets the ACL *type* but does not set ownership, contrary to what both its name and the app's own docs imply | `sudo chown -R 568:568` on the data dataset before install. The Postgres dataset needs UID 999 instead, handled by the installer's **Automatic Permissions** checkbox |
+| `rsync -a` to a Windows drive under WSL appeared to transfer files for 15–25 minutes each, then saved nothing | `drvfs` cannot set Unix ownership/permissions/timestamps, so archive mode fails on `mkstemp` — and rsync transfers the data anyway to keep the protocol in sync before discarding it | `--inplace --no-perms --no-owner --no-group --no-times --omit-dir-times`, which bypasses the temp-file step entirely |
 | Prometheus config vanished after an app reinstall | Config was on ixVolume, which is not durable across reinstalls and is permission-denied from the host shell | Moved config to a dedicated dataset mounted as a **Host Path**, owned `568:568` |
 | Two accidental `rm -rf` deletions during library migration | Operator error while handling four inconsistent naming conventions at once | Both recovered from `.zfs/snapshot/`. The second needed the **weekly** snapshot — the daily had already been destroyed by retention |
 | Jellyfin logged a stream of `IOException`s | Metadata *save-to-media* was enabled against a deliberately read-only media mount | Disabled both save-to-media toggles; metadata is stored in the config dataset instead |
@@ -123,6 +131,8 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - The NAS doubles as a personal VPN exit node — client devices can route their full internet connection out through the home line, verified by a change of originating ASN (Viettel → VNPT) with no DNS leak and no measurable throughput penalty in-country, and confirmed from a real Germany connection with a genuine IP/ASN flip (Deutsche Telekom → VNPT) plus a measured ~28% download / +230 ms latency cost across the real distance.
 - The NAS records a security camera continuously to the ZFS pool with no vendor cloud involvement, survives full reboots unattended, and is viewable remotely over Tailscale at ~1.42 Mbps from within Vietnam and ~0.74 Mbps confirmed at real Germany↔Vietnam distance — both trivial next to the >90 Mbps home connection.
 - System metrics are collected and dashboarded end to end — ~2,770 host metrics scraped every 15s into Prometheus and rendered in Grafana, with the exporter surviving a full reboot unattended via a Post Init script.
+- A multi-thousand-asset photo and video library is self-hosted on the NAS and auto-backs-up from phone and tablet, replacing a paid 50 GB consumer cloud tier — stored in a plain year/month folder tree so the library stays readable with or without the application, and verified byte-identical against an off-site copy on another continent.
+- The camera NVR module was **retired deliberately** after measuring what it cost (36.4 GB of pool, 13–15% sustained CPU) against what the vendor app already provided — freeing exactly the headroom the photo library then needed.
 - A growing media library streams from the NAS with direct play on the native client for most content, no transcoding, and no third-party service in the path — confirmed bitrate-bound (~1.98 Mbps for one TV episode) at real Germany↔Vietnam distance, with almost no CPU used; a real end-to-end request (Seerr → Radarr → download client → Jellyfin) for a full Blu-ray-tier movie was also confirmed working, with the actual Vietnam↔Germany throughput measured at two very different points three weeks apart (~3.78 Mbps and ~22.6 Mbps, not the ~161 Mbps a generic speedtest suggests) — a variable international route, not a fixed ceiling, worked around with a manual quality cap on days it's bad.
 - A full request-to-playback automation pipeline (Seerr → Prowlarr → Sonarr/Radarr → download client → Bazarr) is deployed and confirmed working end to end with a real movie request, with multiple redundant sources configured so no single source's downtime blocks the pipeline. See [Media Automation](docs/arr-stack.md) for this module's disclaimer.
 - Jellyfin access for friends is now a self-service invite link (Wizarr) rather than a manually-created account and a password relayed over chat, confirmed end to end with a real invite → account creation → playback test — set up ahead of a planned expansion to ~10 friends across three countries.
@@ -149,6 +159,14 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - Know which operations are metadata-only. `zfs rename` moved a 35 GB library instantly, and `mv` within a dataset does the same — but a rename also silently breaks anything referencing the old path (a Cloud Sync task and SMB share membership, in this case). Instant is not the same as free of consequences.
 - The cheapest fix for a performance problem is often to stop creating it. The only transcoding case that existed disappeared by using the native client instead of a browser — no GPU, no extra idle watts, no driver compatibility problem to maintain.
 - A destructive script should default to doing nothing. `DRYRUN=1` by default, four preview passes before the first real move — and even then, two `rm -rf` mistakes still happened. Snapshots were the reason those cost minutes instead of a re-download.
+- Some settings are cheap before the first byte and expensive after it. A storage template, an accepted-codec list and a job-scheduling decision each took thirty seconds to set on an empty library; each would have required rewriting or re-encoding the entire library a day later.
+- A default that assumes different hardware fails quietly. The photo app's accepted-codec list defaulted to H.264 only, which would have queued *every* modern phone video for a software transcode on a CPU that can't do it — no error, just an ever-growing job queue.
+- Four rounds of `ping` sent a diagnosis in three wrong directions because the ISP's router drops ICMP. A tool that can't distinguish "blocked" from "broken" isn't a diagnostic; `curl` and `getent` separate DNS resolution from TCP reachability and were what actually found the fault.
+- A fix that appeared to work may not have been the thing that worked. Per-container DNS overrides were credited with resolving this ISP's interference — but if outbound port 53 to those resolvers is blocked from this network, they cannot have been doing what they appeared to. Recorded as an open question rather than quietly corrected.
+- A single throughput number doesn't describe a high-latency path. The same link delivered ~39 Mbps on large media files and ~4.3 Mbps on 36,000 small ones — a 9× spread from per-file round-trip overhead alone. Benchmark with the file-size profile of the actual workload.
+- A measured figure has a shelf life. A throughput number measured once in August drove two significant architecture decisions; re-measuring during unrelated work produced results 5–10× higher. Load-bearing measurements deserve periodic re-testing, not permanent trust.
+- A client's "backup complete" is a claim, not a verification. The server's own asset count, or a `find | wc -l` on the dataset, is what should gate deleting local originals.
+- Removing a module is a result, not a failure. Retiring the NVR was a measured trade — 36.4 GB and 13–15% CPU against a feature the vendor app already did better — and it directly funded the module that replaced it.
 - The same category of bug recurs across every new integration in a stack, not just once. `localhost`-vs-container-name was hit on at least five separate app pairings; recognizing the pattern turns a 20-minute debug into a 20-second fix on the sixth occurrence. See the [Troubleshooting Playbook](docs/troubleshooting.md) for the full set of recurring patterns collected across this project.
 - A working fix from one integration doesn't automatically generalize to the next one solving the same-shaped problem — Wizarr needing the Tailscale IP where Seerr needed the LAN IP for the identical "reach Jellyfin from another Docker network" problem is the clearest example. Verify empirically rather than assuming a prior fix transfers.
 - A UI's status badge is not ground truth. A Custom App stuck "Deploying" with no further detail was resolved in minutes once the investigation moved to `docker ps -a` / `docker logs` / `docker top` instead of waiting on the dashboard.
@@ -169,10 +187,14 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 - [ ] Uptime Kuma for service-reachability checks — complements Grafana rather than duplicating it (Grafana answers "how is the box doing", Uptime Kuma answers "is the service reachable")
 - [ ] Homepage `customapi` widgets for Wizarr and Cleanuparr, if either ever exposes a documented API
 - [ ] Move Homepage's API keys out of `services.yaml` into environment-variable substitution
-- [ ] Document Immich as a module — it runs on the box but appears nowhere in these docs
 - [ ] ZFS-specific Grafana dashboard using the `node_zfs_*` collector
 - [ ] TLS / basic auth in front of node_exporter's `/metrics` endpoint
+- [x] ~~Self-hosted photo library to replace a paid consumer cloud tier~~ → done via [Immich](docs/photos-immich.md)
 - [ ] Nextcloud (personal cloud), Vaultwarden (password manager), Pi-hole (network-wide ad blocking)
+- [ ] Scheduled off-site backup for `tank/immich` — currently a manual `rsync` to an external SSD, point-in-time only
+- [ ] Enable Immich's ML jobs (Smart Search, Facial Recognition) as a deliberate overnight batch — also required for its Duplicate Detection job
+- [ ] Re-measure the Vietnam↔Germany throughput ceiling against the [Immich](docs/photos-immich.md#throughput-correction--the-assumed-figure-was-wrong) findings, and revisit the Jellyfin/seedbox conclusions that depend on it
+- [ ] Re-test whether the arr-stack's per-container `dns:` overrides actually function, given the ISP appears to block port 53 to third-party resolvers
 - [ ] PiKVM for true out-of-band hardware access (board has no IPMI)
 - [ ] Self-hosted DNS (Pi-hole / AdGuard Home) as the tailnet resolver, so exit-node queries terminate on owned infrastructure instead of the ISP's
 - [x] ~~Tailscale subnet router to reach home LAN devices remotely~~ → done, see [Tailscale Exit Node](docs/tailscale-exit-node.md)
@@ -198,4 +220,4 @@ Each module is a self-contained build with its own goals, decisions, problems hi
 
 ---
 
-**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node) · SMB/Samba · rclone (Cloud Sync) · Frigate + go2rtc (NVR) · Prometheus + Grafana + node_exporter · Jellyfin · Homepage · Prowlarr · Sonarr · Radarr · Lidarr · Bazarr · a download client · Seerr (Jellyseerr) · Wizarr · Cleanuparr
+**Stack:** TrueNAS CE · ZFS · Tailscale (WireGuard mesh + exit node + subnet router) · SMB/Samba · rclone (Cloud Sync) · Prometheus + Grafana + node_exporter · Jellyfin · Immich (PostgreSQL + Redis) · Prowlarr · Sonarr · Radarr · Lidarr · Bazarr · a download client · Seerr · Wizarr · Cleanuparr · Homepage
